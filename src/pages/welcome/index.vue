@@ -72,13 +72,10 @@
           <view class="ai-content-box">
             <view class="ai-msg">
               <view class="rich-text">
-                <view class="markdown-body" v-if="!msg.showRaw" v-html="renderMarkdown(msg.content)"></view>
-                <view class="raw-content-view" v-else>
-                  <text selectable class="raw-text-content">{{ msg.content }}</text>
-                </view>
+                <view class="markdown-body" v-html="renderMarkdown(msg.content)"></view>
                 
                 <!-- Sources Section: GPT Style Cards -->
-                <view v-if="getDetailedSources(msg.content).length > 0 && !msg.showRaw" class="sources-footer">
+                <view v-if="getDetailedSources(msg.content).length > 0" class="sources-footer">
                   <view class="sources-list">
                     <view 
                       v-for="source in getDetailedSources(msg.content)" 
@@ -107,10 +104,6 @@
               </view>
               
               <view v-if="!isStreaming || index < messages.length - 1" class="interact-bar">
-                <view class="interact-btn" @click="msg.showRaw = !msg.showRaw">
-                  <AppIcon :name="msg.showRaw ? 'visibility' : 'code'" size="32" :color="msg.showRaw ? '#1a73e8' : '#666'" />
-                  <text class="btn-txt">{{ msg.showRaw ? '视图' : '原文' }}</text>
-                </view>
                 <view 
                   class="interact-btn" 
                   :class="{ active: msg.interaction === 'liked' }"
