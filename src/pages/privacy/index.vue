@@ -92,8 +92,20 @@ const reject = () => {
     cancelText: '退出',
     success: (res) => {
       if (res.cancel) {
-        // In real Mini Program, you could exit here
-        uni.showToast({ title: '已退出', icon: 'none' });
+        // Guard the call to prevent "is not a function" error in non-mini-program environments
+        if (typeof uni.exitMiniProgram === 'function') {
+          uni.exitMiniProgram({
+            success: () => {
+              console.log('Exit success');
+            },
+            fail: () => {
+              uni.showToast({ title: '请手动关闭页面', icon: 'none' });
+            }
+          });
+        } else {
+          // Fallback UI for web preview
+          uni.showToast({ title: '非小程序环境，请手动关闭', icon: 'none' });
+        }
       }
     }
   });
