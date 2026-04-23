@@ -9,17 +9,23 @@ const BASE_URL = `https://dashscope.aliyuncs.com/api/v2/apps/agent/${APP_ID}/com
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  showRaw?: boolean;
+  interaction?: 'liked' | 'feedbacked' | null;
 }
 
-export async function chatStream(
+export interface ChatStreamHandle {
+  abort: () => void;
+}
+
+export function chatStream(
   messages: ChatMessage[],
   onChunk: (delta: string) => void,
   onComplete: (fullText: string) => void,
   onError: (error: any) => void
-) {
+): ChatStreamHandle {
   if (!API_KEY || !APP_ID) {
     onError(new Error('Missing API_KEY or APP_ID in environment variables.'));
-    return;
+    return { abort: () => {} };
   }
 
   let fullText = '';
@@ -43,7 +49,6 @@ export async function chatStream(
     },
     enableChunked: true,
     success: (res) => {
-      // For chunked, success is called when the connection is closed
       if (res.statusCode !== 200) {
         onError(new Error(`Request failed with status ${res.statusCode}`));
       } else {
@@ -51,26 +56,26 @@ export async function chatStream(
       }
     },
     fail: (err) => {
-      console.error('Request failed:', err);
-      onError(err);
+      const errMsg = err.errMsg || (err.message ? err.message : '');
+      if (errMsg.includes('abort') || errMsg.includes('BodyStreamBuffer was aborted')) {
+        console.log('Request aborted');
+        onComplete(fullText); // Complete with what we have
+      } else {
+        console.error('Request failed:', err);
+        onError(err);
+      }
     }
   }) as any;
 
-  // WeChat Mini Program specific: onChunkReceived
   if (requestTask.onChunkReceived) {
     requestTask.onChunkReceived((res: any) => {
       const arrayBuffer = res.data;
       const uint8Array = new Uint8Array(arrayBuffer);
-      
-      // Convert ArrayBuffer to string (UTF-8)
       let str = '';
       try {
         if (decoder) {
-          // Use stream: true to maintain state between chunks
           str = decoder.decode(uint8Array, { stream: true });
         } else {
-          // Fallback: This is not ideal for multi-byte, but better than nothing
-          // For Mini Program, normally TextDecoder is available in newer versions
           str = decodeUtf8(uint8Array);
         }
       } catch (e) {
@@ -78,33 +83,32 @@ export async function chatStream(
       }
 
       buffer += str;
-      
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
       for (const line of lines) {
         if (!line.trim()) continue;
-
         const dataMatch = line.match(/data:(.*)$/);
         if (dataMatch) {
           try {
             const data = JSON.parse(dataMatch[1]);
-            
             if (data.type === 'response.output_text.delta' && data.delta) {
               onChunk(data.delta);
               fullText += data.delta;
             }
-          } catch (e) {
-            // Might be a partial JSON or non-JSON data line
-          }
+          } catch (e) {}
         }
       }
     });
-
-    // Also handle finish if onComplete wasn't called by data events
-  } else {
-    onError(new Error('This environment does not support streaming requests (chunked response).'));
   }
+
+  return {
+    abort: () => {
+      if (requestTask && typeof requestTask.abort === 'function') {
+        requestTask.abort();
+      }
+    }
+  };
 }
 
 // Simple UTF-8 decoder fallback for when TextDecoder is missing

@@ -66,11 +66,32 @@
 
         <!-- AI Answer -->
         <view v-else class="ai-msg-row">
-          <view class="avatar">智护</view>
+          <view class="avatar">
+            <AppIcon name="security" size="52" color="#1a73e8" fill />
+          </view>
           <view class="ai-content-box">
             <view class="ai-msg">
               <view class="rich-text">
-                <view class="markdown-body" v-html="renderMarkdown(msg.content)"></view>
+                <view class="markdown-body" v-if="!msg.showRaw" v-html="renderMarkdown(msg.content)"></view>
+                <view class="raw-content-view" v-else>
+                  <text selectable class="raw-text-content">{{ msg.content }}</text>
+                </view>
+                
+                <!-- Sources Section: GPT Style Cards -->
+                <view v-if="getDetailedSources(msg.content).length > 0 && !msg.showRaw" class="sources-footer">
+                  <view class="sources-list">
+                    <view 
+                      v-for="source in getDetailedSources(msg.content)" 
+                      :key="source.id" 
+                      class="source-pill"
+                    >
+                      <AppIcon name="policy" size="24" color="#94a3b8" />
+                      <view class="pill-id">{{ source.id }}</view>
+                      <text class="pill-name">{{ source.name }}</text>
+                    </view>
+                  </view>
+                </view>
+
                 <!-- Searching status -->
                 <view v-if="isStreaming && index === messages.length - 1" class="searching-status">
                   <view class="search-icon-box">
@@ -86,6 +107,10 @@
               </view>
               
               <view v-if="!isStreaming || index < messages.length - 1" class="interact-bar">
+                <view class="interact-btn" @click="msg.showRaw = !msg.showRaw">
+                  <AppIcon :name="msg.showRaw ? 'visibility' : 'code'" size="32" :color="msg.showRaw ? '#1a73e8' : '#666'" />
+                  <text class="btn-txt">{{ msg.showRaw ? '视图' : '原文' }}</text>
+                </view>
                 <view 
                   class="interact-btn" 
                   :class="{ active: msg.interaction === 'liked' }"
@@ -113,7 +138,6 @@
     <!-- Input Bar -->
     <view class="input-bar-container" :style="{ paddingBottom: keyboardHeight > 0 ? (keyboardHeight + 10) + 'px' : 'calc(40rpx + env(safe-area-inset-bottom))' }">
       <view class="input-bar">
-        <AppIcon name="mic" size="44" color="#9ca3af" />
         <input 
           v-model="inputValue"
           class="flex-1 px-2 text-input"
@@ -135,7 +159,7 @@
             @click="handleSend"
           >
             <AppIcon 
-              :name="isStreaming ? 'stop' : 'send'" 
+              name="send" 
               size="40" 
               :color="(inputValue.trim() || isStreaming) ? '#fff' : '#d1d5db'" 
               fill 
@@ -187,7 +211,12 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { chatStream, type ChatMessage } from '@/services/aiService';
 import MarkdownIt from 'markdown-it';
 
-const md = new MarkdownIt();
+const md = new MarkdownIt({
+  html: true,
+  linkify: true,
+  typographer: true,
+  breaks: true // Convert '\n' in paragraphs into <br>
+});
 
 const inputValue = ref('');
 const chatScrollTop = ref(0);
@@ -229,8 +258,140 @@ const scrollToBottom = (force = false) => {
   }, 200);
 };
 
+// Citation Tokens from Documentation
+const CITATION_START = '\uE200';
+const CITATION_DELIMITER = '\uE202';
+const CITATION_STOP = '\uE201';
+
 const renderMarkdown = (content: string) => {
-  return md.render(content);
+  if (!content) return '';
+  
+  // 1. Split body content from the citation list more reliably
+  const separators = ['参考资料', '参考来源', 'Sources', 'References'];
+  let displayBody = content;
+  
+  // High priority: Footnote definitions [^1]:
+  const footnoteIndex = content.search(/\n\[\^(\d+)\]:/);
+  
+  // Find the earliest occurrence of any separator
+  let sepIndex = -1;
+  for (const sep of separators) {
+    const index = content.lastIndexOf(sep);
+    if (index !== -1 && (sepIndex === -1 || index < sepIndex)) {
+      sepIndex = index;
+    }
+  }
+
+  // Decision logic for splitting
+  if (footnoteIndex !== -1) {
+    displayBody = content.substring(0, footnoteIndex);
+  } else if (sepIndex !== -1) {
+    displayBody = content.substring(0, sepIndex);
+  } else {
+    // Falls back to numbered lists at the bottom
+    const listMatch = content.match(/\n[\[\(【]?1[\]\)】†]?[:：\.\s]/);
+    if (listMatch && listMatch.index !== undefined && listMatch.index > content.length * 0.6) {
+      displayBody = content.substring(0, listMatch.index);
+    }
+  }
+
+  // 2. Identify and style citations: Handle Unicode Tokens AND Standard Markdown
+  
+  // 2a. DOC standards (Unicode tokens): \uE200cite\uE202source_id(\uE202locator)?\uE201
+  const docCitationRegex = new RegExp(`${CITATION_START}cite${CITATION_DELIMITER}([\\s\\S]*?)${CITATION_STOP}`, 'g');
+  let processedContent = displayBody.replace(docCitationRegex, (match, body) => {
+    const parts = body.split(CITATION_DELIMITER);
+    const sourceIdMatch = parts[0].match(/(\d+)/);
+    const displayId = sourceIdMatch ? sourceIdMatch[1] : 'i';
+    return `<span class="citation-tag">${displayId}</span>`;
+  });
+
+  // 2b. Standard fallback citations: [1], [^1^], 【1】, [^1]
+  processedContent = processedContent
+    .replace(/\[\^?(\d+)\^?\]/g, '<span class="citation-tag">$1</span>')
+    .replace(/\[(\d+)\]/g, '<span class="citation-tag">$1</span>')
+    .replace(/【(\d+)[†:]?[^】]*】/g, '<span class="citation-tag">$1</span>');
+  
+  return md.render(processedContent);
+};
+
+// Helper to extract and parse actual source names
+interface SourceInfo {
+  id: string;
+  name: string;
+}
+
+// Clean markdown links from text [text](url) -> text
+const stripMarkdownLinks = (text: string) => {
+  return text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+};
+
+const getDetailedSources = (content: string): SourceInfo[] => {
+  if (!content) return [];
+  
+  const separators = ['参考资料', '参考来源', 'Sources', 'References'];
+  let sourceText = '';
+  
+  // Try to find the start of the source section
+  const footnoteMatch = content.match(/\n\[\^(\d+)\]:/);
+  let splitIndex = -1;
+  
+  for (const sep of separators) {
+    const index = content.lastIndexOf(sep);
+    if (index !== -1 && (splitIndex === -1 || index > splitIndex)) {
+      splitIndex = index + sep.length;
+    }
+  }
+
+  if (footnoteMatch && footnoteMatch.index !== undefined) {
+    // Footnotes are the strongest signal
+    sourceText = content.substring(footnoteMatch.index);
+  } else if (splitIndex !== -1) {
+    sourceText = content.substring(splitIndex);
+  } else {
+    // Fallback search only at the bottom part
+    const listMatch = content.match(/\n(([\[\(【]?1[\]\)】†]?[:：\.\s]).*)/s);
+    if (listMatch && listMatch.index !== undefined && listMatch.index > content.length * 0.6) {
+      sourceText = listMatch[1];
+    }
+  }
+
+  if (!sourceText) return [];
+
+  const lines = sourceText.split('\n')
+    .map(l => l.trim())
+    .filter(l => l && !separators.some(s => l.toLowerCase().includes(s.toLowerCase())));
+    
+  const sources: SourceInfo[] = [];
+  lines.forEach(line => {
+    // Matches patterns like [^1]: content or [1] content
+    const match = line.match(/^([\[\(【]?\^?(\d+)[\]\)】†]*[:：\.\s]*)(.*)/);
+    if (match) {
+      const id = match[2];
+      let rawName = match[3].trim();
+      
+      // Secondary cleaning for standard names wrapped in brackets: [GB 12345] -> GB 12345
+      if (rawName.startsWith('[') && rawName.includes(']')) {
+        const bracketMatch = rawName.match(/^\[([^\]]+)\]/);
+        if (bracketMatch) {
+          rawName = bracketMatch[1];
+        }
+      }
+      
+      // Clean up markdown bolding, links, etc.
+      let name = stripMarkdownLinks(rawName)
+        .replace(/\*\*/g, '') // Remove bold
+        .replace(/__/g, '')   // Remove italic
+        .split(/[|｜]/)[0]
+        .trim();
+      
+      if (name && !sources.some(s => s.id === id)) {
+        sources.push({ id, name });
+      }
+    }
+  });
+
+  return sources;
 };
 
 const exampleQuestions = [
@@ -337,12 +498,12 @@ const startChat = async (userText: string) => {
 
   // 3. Prepare full conversation for API (keeping it simple for now)
   const apiMessages: ChatMessage[] = messages.value.slice(0, aiMsgIndex).map(m => ({
-    role: m.role === 'ai' ? 'assistant' : m.role,
+    role: m.role as any,
     content: m.content
   }));
 
   // 4. Call Aliyun Bailian API
-  await chatStream(
+  chatStream(
     apiMessages,
     (delta) => {
       if (messages.value[aiMsgIndex]) {
@@ -357,7 +518,7 @@ const startChat = async (userText: string) => {
     },
     (error) => {
       isStreaming.value = false;
-      if (messages.value[aiMsgIndex]) {
+      if (messages.value[aiMsgIndex] && !messages.value[aiMsgIndex].content) {
         messages.value[aiMsgIndex].content = '抱歉，服务出现了一点问题，请稍后再试。';
       }
       uni.showToast({ title: '连接失败', icon: 'none' });
@@ -507,43 +668,211 @@ const toggleLike = (index: number) => {
 .user-msg { max-width: 85%; background-color: #1a73e8; color: white; padding: 24rpx 36rpx; border-radius: 32rpx 32rpx 4rpx 32rpx; font-size: 30rpx; }
 
 .ai-msg-row { display: flex; flex-direction: column; align-items: flex-start; gap: 16rpx; margin-bottom: 48rpx; width: 100%; }
-.avatar { width: 64rpx; height: 64rpx; border-radius: 12rpx; background-color: #eef2f7; color: #1a73e8; display: flex; align-items: center; justify-content: center; font-size: 22rpx; font-weight: bold; flex-shrink: 0; box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.05); }
+.avatar { 
+  width: 80rpx; 
+  height: 80rpx; 
+  background-color: #f0f7ff;
+  border-radius: 16rpx;
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  flex-shrink: 0; 
+}
 .ai-content-box { width: 100%; }
 .ai-msg { background-color: #fff; padding: 28rpx 36rpx; border-radius: 4rpx 28rpx 28rpx 28rpx; box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.05); border: 1rpx solid #f0f0f0; width: 100%; box-sizing: border-box; }
 
+/* Markdown Body Enhancements */
 .markdown-body {
   font-size: 28rpx;
   line-height: 1.6;
   color: #333;
   word-break: break-all;
-  white-space: pre-wrap;
 }
-.markdown-body p {
-  margin-bottom: 16rpx;
+
+:deep(.markdown-body p) {
+  margin-bottom: 20rpx;
+  display: block;
 }
-.markdown-body p:last-child {
+
+:deep(.markdown-body p:last-child) {
   margin-bottom: 0;
 }
-.markdown-body strong {
-  font-weight: bold;
-  color: #1a1a1a;
+
+:deep(.markdown-body ul), 
+:deep(.markdown-body ol) {
+  margin-bottom: 20rpx;
+  padding-left: 40rpx;
 }
-.markdown-body ul, .markdown-body ol {
-  padding-left: 32rpx;
-  margin-bottom: 16rpx;
-}
-.markdown-body li {
+
+:deep(.markdown-body li) {
   margin-bottom: 8rpx;
 }
-.markdown-body blockquote {
-  border-left: 4rpx solid #e5e7eb;
-  padding-left: 16rpx;
+
+/* TABLE STYLES - CRITICAL FIX */
+:deep(.markdown-body table) {
+  width: 100% !important;
+  border-collapse: collapse;
+  margin: 20rpx 0;
+  font-size: 24rpx;
+  background-color: #fff;
+  border: 1rpx solid #e5e7eb;
+}
+
+:deep(.markdown-body th),
+:deep(.markdown-body td) {
+  border: 1rpx solid #e5e7eb;
+  padding: 12rpx 16rpx;
+  text-align: left;
+}
+
+:deep(.markdown-body th) {
+  background-color: #f9fafb;
+  font-weight: bold;
+  color: #374151;
+}
+
+:deep(.markdown-body tr:nth-child(even)) {
+  background-color: #fbfbfb;
+}
+
+.raw-content-view {
+  background-color: #1e293b;
+  padding: 24rpx;
+  border-radius: 12rpx;
+  margin: 16rpx 0;
+  border: 1rpx solid #334155;
+  box-shadow: inset 0 2rpx 8rpx rgba(0,0,0,0.2);
+}
+.raw-text-content {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 24rpx;
+  color: #e2e8f0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Citation Tags Styling - GPT Bubble Style */
+:deep(.citation-tag) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f1f5f9;
+  color: #64748b;
+  font-size: 16rpx;
+  min-width: 24rpx;
+  height: 24rpx;
+  border-radius: 50%;
+  margin: 0 4rpx;
+  vertical-align: super;
+  font-weight: 700;
+  border: 1rpx solid #e2e8f0;
+  padding: 0 2rpx;
+  line-height: 1;
+}
+
+/* Sources Footer Styling - GPT Source Cards */
+.sources-footer {
+  margin-top: 24rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid #f1f5f9;
+}
+
+.sources-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.source-pill {
+  display: flex;
+  align-items: center;
+  background-color: #fff;
+  padding: 8rpx 16rpx 8rpx 10rpx;
+  border-radius: 12rpx;
+  border: 1.5rpx solid #e2e8f0;
+  max-width: 100%;
+  transition: all 0.2s ease;
+  box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.02);
+  gap: 8rpx;
+}
+
+.source-pill:active {
+  background-color: #f8fafc;
+  transform: scale(0.98);
+}
+
+.pill-id {
+  font-size: 14rpx;
+  color: #94a3b8;
+  font-weight: bold;
+  padding: 2rpx 6rpx;
+  background: #f1f5f9;
+  border-radius: 4rpx;
+  line-height: 1;
+}
+
+.pill-name {
+  font-size: 24rpx;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+:deep(blockquote) {
+  border-left: 8rpx solid #e5e7eb;
+  padding-left: 24rpx;
   color: #666;
   font-style: italic;
   margin: 16rpx 0;
+  background-color: #f9fafb;
+  padding: 12rpx 24rpx;
+  border-radius: 4rpx;
+}
+.rich-text .p { font-size: 28rpx; line-height: 1.6; color: #333; word-break: break-all; margin-bottom: 16rpx; }
+
+/* Markdown Table Styles */
+:deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20rpx 0;
+  font-size: 24rpx;
+  background-color: #fff;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 8rpx;
+  overflow: hidden;
+}
+:deep(th), :deep(td) {
+  padding: 16rpx 20rpx;
+  border: 1rpx solid #e2e8f0;
+  text-align: left;
+}
+:deep(th) {
+  background-color: #f8fafc;
+  font-weight: 600;
+  color: #475569;
+}
+:deep(tr:nth-child(even)) {
+  background-color: #fafafa;
 }
 
-.rich-text .p { font-size: 28rpx; line-height: 1.6; color: #333; word-break: break-all; }
+/* List Styles */
+:deep(ul), :deep(ol) {
+  padding-left: 40rpx;
+  margin: 16rpx 0;
+}
+:deep(li) {
+  margin-bottom: 8rpx;
+  color: #333;
+}
+
+/* Mobile-safe table container */
+.markdown-body {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 
 .searching-status {
   display: inline-flex;
