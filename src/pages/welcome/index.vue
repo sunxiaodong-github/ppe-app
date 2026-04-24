@@ -27,11 +27,6 @@
         <view class="h1">Hi, 我是智护AI~</view>
         <view class="p">随时为您解答安全生产标准与规范</view>
         
-        <view class="categories">
-          <view class="cat-chip">安全帽</view>
-          <view class="cat-chip">口罩/呼吸</view>
-          <view class="cat-chip">安全带/挂钩</view>
-        </view>
       </view>
 
       <view class="section-title">你可以这样问我</view>
@@ -60,7 +55,7 @@
         <!-- User Question -->
         <view v-if="msg.role === 'user'" class="user-msg-row">
           <view class="user-msg">
-            <text>{{ msg.content }}</text>
+            <text selectable="true">{{ msg.content }}</text>
           </view>
         </view>
 
@@ -74,23 +69,63 @@
               <view class="rich-text">
                 <view class="markdown-body" v-html="renderMarkdown(msg.content)"></view>
                 
-                <!-- Sources Section: GPT Style Cards -->
+                <!-- Sources Section: Refined Citations -->
                 <view v-if="getDetailedSources(msg.content).length > 0" class="sources-footer">
-                  <view class="sources-list">
+                  <view class="sources-header" @click="toggleSources(index)">
+                    <view class="sources-header-left">
+                      <AppIcon 
+                        name="chevron_right" 
+                        size="32" 
+                        color="#1a73e8" 
+                        :style="{ transform: msg.sourcesExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }" 
+                      />
+                      <text class="sources-title">参考资料</text>
+                      <view class="sources-count-badge">{{ getDetailedSources(msg.content).length }}</view>
+                    </view>
+                  </view>
+                  
+                  <view 
+                    v-if="msg.sourcesExpanded" 
+                    class="sources-content-list animate-fade-in"
+                  >
                     <view 
                       v-for="source in getDetailedSources(msg.content)" 
                       :key="source.id" 
-                      class="source-pill"
+                      class="source-link-item" 
+                      @click="openSource(source)"
                     >
-                      <AppIcon name="policy" size="24" color="#94a3b8" />
-                      <view class="pill-id">{{ source.id }}</view>
-                      <text class="pill-name">{{ source.name }}</text>
+                      <text class="source-no">[{{ source.id }}]</text>
+                      <text class="source-label" :class="{ 'clickable-link': source.url }">{{ source.name }}</text>
+                      <AppIcon v-if="source.url" name="open_in_new" size="18" color="#1a73e8" />
                     </view>
                   </view>
                 </view>
 
-                <!-- Searching status -->
-                <view v-if="isStreaming && index === messages.length - 1" class="searching-status">
+                <view v-if="!isStreaming || index < messages.length - 1" class="interact-bar">
+                  <view 
+                    class="interact-btn" 
+                    :class="{ active: msg.interaction === 'liked' }"
+                    @click="toggleLike(index)"
+                  >
+                    <AppIcon name="thumb_up" size="24" :fill="msg.interaction === 'liked'" :color="msg.interaction === 'liked' ? '#1a73e8' : '#94a3b8'" />
+                    <text class="btn-txt">赞同</text>
+                  </view>
+                  <view 
+                    class="interact-btn"
+                    :class="{ active: msg.interaction === 'feedbacked' }"
+                    @click="goFeedback(index)"
+                  >
+                    <AppIcon name="thumb_down" size="24" :fill="msg.interaction === 'feedbacked'" :color="msg.interaction === 'feedbacked' ? '#1a73e8' : '#94a3b8'" />
+                    <text class="btn-txt">反馈</text>
+                  </view>
+
+                </view>
+
+
+              </view>
+                
+              <!-- Searching status -->
+              <view v-if="isStreaming && index === messages.length - 1" class="searching-status">
                   <view class="search-icon-box">
                     <AppIcon name="search" size="24" color="#1a73e8" />
                   </view>
@@ -102,29 +137,9 @@
                   </view>
                 </view>
               </view>
-              
-              <view v-if="!isStreaming || index < messages.length - 1" class="interact-bar">
-                <view 
-                  class="interact-btn" 
-                  :class="{ active: msg.interaction === 'liked' }"
-                  @click="toggleLike(index)"
-                >
-                  <AppIcon name="thumb_up" size="32" :fill="msg.interaction === 'liked'" />
-                  <text class="btn-txt">赞同</text>
-                </view>
-                <view 
-                  class="interact-btn"
-                  :class="{ active: msg.interaction === 'feedbacked' }"
-                  @click="goFeedback(index)"
-                >
-                  <AppIcon name="thumb_down" size="32" :fill="msg.interaction === 'feedbacked'" />
-                  <text class="btn-txt">反馈</text>
-                </view>
-              </view>
             </view>
           </view>
         </view>
-      </view>
       <view class="scroll-anchor"></view>
     </scroll-view>
 
@@ -152,6 +167,8 @@
             @click="handleSend"
           >
             <AppIcon 
+              v-if="!isStreaming"
+              class="send-icon"
               name="send" 
               size="40" 
               :color="(inputValue.trim() || isStreaming) ? '#fff' : '#d1d5db'" 
@@ -160,6 +177,7 @@
           </view>
         </view>
       </view>
+      <view class="ai-disclaimer">内容由AI生成</view>
     </view>
 
     <!-- Reverted Feedback Modal -->
@@ -230,8 +248,8 @@ const pageTitle = computed(() => {
   const firstUserMsg = messages.value.find(m => m.role === 'user');
   if (!firstUserMsg) return '智护AI';
   const content = firstUserMsg.content || '';
-  if (content.length <= 12) return content;
-  return content.substring(0, 12) + '...';
+  if (content.length <= 10) return content;
+  return content.substring(0, 10) + '...';
 });
 
 // Use a throttled version for scrolling
@@ -259,14 +277,11 @@ const CITATION_STOP = '\uE201';
 const renderMarkdown = (content: string) => {
   if (!content) return '';
   
-  // 1. Split body content from the citation list more reliably
+  // 1. Identify where references start
   const separators = ['参考资料', '参考来源', 'Sources', 'References'];
   let displayBody = content;
-  
-  // High priority: Footnote definitions [^1]:
   const footnoteIndex = content.search(/\n\[\^(\d+)\]:/);
   
-  // Find the earliest occurrence of any separator
   let sepIndex = -1;
   for (const sep of separators) {
     const index = content.lastIndexOf(sep);
@@ -275,49 +290,120 @@ const renderMarkdown = (content: string) => {
     }
   }
 
-  // Decision logic for splitting
   if (footnoteIndex !== -1) {
     displayBody = content.substring(0, footnoteIndex);
   } else if (sepIndex !== -1) {
     displayBody = content.substring(0, sepIndex);
   } else {
-    // Falls back to numbered lists at the bottom
     const listMatch = content.match(/\n[\[\(【]?1[\]\)】†]?[:：\.\s]/);
     if (listMatch && listMatch.index !== undefined && listMatch.index > content.length * 0.6) {
       displayBody = content.substring(0, listMatch.index);
     }
   }
 
+  // Extract sources to used for link transformation
+  const sources = getDetailedSources(content);
+
   // 2. Identify and style citations: Handle Unicode Tokens AND Standard Markdown
   
-  // 2a. DOC standards (Unicode tokens): \uE200cite\uE202source_id(\uE202locator)?\uE201
+  // 2a. DOC standards (Unicode tokens)
   const docCitationRegex = new RegExp(`${CITATION_START}cite${CITATION_DELIMITER}([\\s\\S]*?)${CITATION_STOP}`, 'g');
   let processedContent = displayBody.replace(docCitationRegex, (match, body) => {
     const parts = body.split(CITATION_DELIMITER);
     const sourceIdMatch = parts[0].match(/(\d+)/);
     const displayId = sourceIdMatch ? sourceIdMatch[1] : 'i';
+    const num = parseInt(displayId);
+    const source = sources.find(s => s.id === displayId);
+    if (source && source.url) {
+      return `<a href="${source.url}" target="_blank" class="citation-link">${displayId}</a>`;
+    }
     return `<span class="citation-tag">${displayId}</span>`;
   });
 
-  // 2b. Standard fallback citations: [1], [^1^], 【1】, [^1]
+  // 2b. Standard fallback citations: avoid breaking normal links [text](url)
+  // We look for [n] or [n, m] where n, m are 1-2 digits, and it's NOT followed by ( or :
   processedContent = processedContent
-    .replace(/\[\^?(\d+)\^?\]/g, '<span class="citation-tag">$1</span>')
-    .replace(/\[(\d+)\]/g, '<span class="citation-tag">$1</span>')
-    .replace(/【(\d+)[†:]?[^】]*】/g, '<span class="citation-tag">$1</span>');
+    .replace(/\[\^?((?:\d{1,2}\s*,\s*)*\d{1,2})\](?!\s*[\(:])/g, (match, ids) => {
+      const idList = ids.split(',').map(id => id.trim());
+      return idList.map(id => {
+        const source = sources.find(s => s.id === id);
+        if (source && source.url) {
+          return `<a href="${source.url}" target="_blank" class="citation-link">${id}</a>`;
+        }
+        return `<span class="citation-tag">${id}</span>`;
+      }).join('');
+    })
+    .replace(/【((?:\d{1,2}\s*,\s*)*\d{1,2})[†:]?[^】]*】/g, (match, ids) => {
+      // Handle the 【1, 2】 case too
+      const idList = ids.split(',').map(id => id.trim().replace(/[†:]/g, ''));
+      return idList.map(id => {
+        const source = sources.find(s => s.id === id);
+        if (source && source.url) {
+          return `<a href="${source.url}" target="_blank" class="citation-link">${id}</a>`;
+        }
+        return `<span class="citation-tag">${id}</span>`;
+      }).join('');
+    });
   
-  return md.render(processedContent);
+  // 3. Table Recognition & Fixes
+  // Keep the references part at the end so markdown-it can resolve potentially relative links if any
+  // But wrap it in a hidden div so it doesn't show up in the middle of the chat
+  const footerContent = content.substring(displayBody.length);
+  const fullContentToRender = processedContent + '\n\n<div class="markdown-footer-refs">\n\n' + footerContent + '\n\n</div>';
+  let tableFixed = fullContentToRender.replace(/｜/g, '|'); 
+  
+  const lines = tableFixed.split('\n');
+  const resultLines = [];
+  let inTable = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const trimmedLine = rawLine.trim();
+    const hasPipe = trimmedLine.includes('|');
+    const isSeparator = /^[:\-\| ]+$/.test(trimmedLine) && trimmedLine.includes('-') && trimmedLine.length > 2;
+    
+    if (hasPipe || isSeparator) {
+      if (!inTable) {
+        if (resultLines.length > 0 && resultLines[resultLines.length - 1] !== '') {
+          resultLines.push('');
+        }
+        inTable = true;
+      }
+      resultLines.push(trimmedLine);
+    } else {
+      if (inTable) {
+        if (trimmedLine === '') {
+          let continues = false;
+          for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+            const lookahead = lines[j].trim();
+            if (lookahead.includes('|') || (/^[:\-\| ]+$/.test(lookahead) && lookahead.includes('-'))) {
+              continues = true;
+              break;
+            }
+            if (lookahead !== '') break;
+          }
+          if (continues) continue;
+        }
+        inTable = false;
+        resultLines.push('');
+        if (trimmedLine !== '') resultLines.push(rawLine);
+      } else {
+        resultLines.push(rawLine);
+      }
+    }
+  }
+
+  let finalContent = resultLines.join('\n');
+  
+  return md.render(finalContent);
 };
 
 // Helper to extract and parse actual source names
 interface SourceInfo {
   id: string;
   name: string;
+  url?: string;
 }
-
-// Clean markdown links from text [text](url) -> text
-const stripMarkdownLinks = (text: string) => {
-  return text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
-};
 
 const getDetailedSources = (content: string): SourceInfo[] => {
   if (!content) return [];
@@ -337,12 +423,10 @@ const getDetailedSources = (content: string): SourceInfo[] => {
   }
 
   if (footnoteMatch && footnoteMatch.index !== undefined) {
-    // Footnotes are the strongest signal
     sourceText = content.substring(footnoteMatch.index);
   } else if (splitIndex !== -1) {
     sourceText = content.substring(splitIndex);
   } else {
-    // Fallback search only at the bottom part
     const listMatch = content.match(/\n(([\[\(【]?1[\]\)】†]?[:：\.\s]).*)/s);
     if (listMatch && listMatch.index !== undefined && listMatch.index > content.length * 0.6) {
       sourceText = listMatch[1];
@@ -356,34 +440,42 @@ const getDetailedSources = (content: string): SourceInfo[] => {
     .filter(l => l && !separators.some(s => l.toLowerCase().includes(s.toLowerCase())));
     
   const sources: SourceInfo[] = [];
+  const urlRegex = /(https?:\/\/[^\s\)\],]+)/g;
+
   lines.forEach(line => {
-    // Matches patterns like [^1]: content or [1] content
     const match = line.match(/^([\[\(【]?\^?(\d+)[\]\)】†]*[:：\.\s]*)(.*)/);
     if (match) {
       const id = match[2];
-      let rawName = match[3].trim();
+      const rawText = match[3].trim();
       
-      // Secondary cleaning for standard names wrapped in brackets: [GB 12345] -> GB 12345
-      if (rawName.startsWith('[') && rawName.includes(']')) {
-        const bracketMatch = rawName.match(/^\[([^\]]+)\]/);
-        if (bracketMatch) {
-          rawName = bracketMatch[1];
+      let url = '';
+      let name = '';
+      
+      const mdLinkMatch = rawText.match(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/);
+      if (mdLinkMatch) {
+        name = mdLinkMatch[1];
+        url = mdLinkMatch[2];
+      } else {
+        const urlMatch = rawText.match(urlRegex);
+        if (urlMatch) {
+          url = urlMatch[0];
+          name = rawText.replace(url, '').trim()
+            .replace(/[:：\s\-\(\)\[\]]+$/, '')
+            .replace(/^[:：\s\-\(\)\[\]]+/, '');
+          if (!name) name = url;
+        } else {
+          name = rawText;
         }
       }
       
-      // Clean up markdown bolding, links, etc.
-      let name = stripMarkdownLinks(rawName)
-        .replace(/\*\*/g, '') // Remove bold
-        .replace(/__/g, '')   // Remove italic
-        .split(/[|｜]/)[0]
-        .trim();
+      name = name.replace(/[\*\#\_]+/g, '').trim();
       
-      if (name && !sources.some(s => s.id === id)) {
-        sources.push({ id, name });
+      if (id && name && !sources.some(s => s.id === id)) {
+        sources.push({ id, name, url });
       }
     }
   });
-
+  
   return sources;
 };
 
@@ -538,6 +630,30 @@ const toggleLike = (index: number) => {
   const currentStatus = messages.value[index].interaction;
   messages.value[index].interaction = currentStatus === 'liked' ? 'none' : 'liked';
 };
+
+const toggleSources = (index: number) => {
+  if (messages.value[index]) {
+    messages.value[index].sourcesExpanded = !messages.value[index].sourcesExpanded;
+  }
+};
+
+
+
+const openSource = (source: SourceInfo) => {
+  if (source.url) {
+    // #ifdef H5
+    window.open(source.url, '_blank');
+    // #endif
+    // #ifndef H5
+    uni.setClipboardData({
+      data: source.url,
+      success: () => {
+        uni.showToast({ title: '链接已复制，请在浏览器中访问', icon: 'none' });
+      }
+    });
+    // #endif
+  }
+};
 </script>
 
 <style>
@@ -545,35 +661,49 @@ const toggleLike = (index: number) => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: linear-gradient(180deg, #f0f4f9 0%, #f6f6f6 100%);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 .header {
-  padding-top: calc(60rpx + env(safe-area-inset-top));
-  padding-left: 40rpx;
-  padding-right: 40rpx;
+  padding-top: calc(var(--status-bar-height) + 40rpx);
+  padding-left: 48rpx;
+  padding-right: 48rpx;
   padding-bottom: 30rpx;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #f0f4f9;
+  background: transparent;
   z-index: 10;
 }
-.left-actions { display: flex; align-items: center; gap: 30rpx; }
+.left-actions { display: flex; align-items: center; gap: 32rpx; }
 .menu-icon {
   display: flex;
   flex-direction: column;
-  gap: 10rpx;
+  gap: 12rpx;
   width: 44rpx;
   padding: 10rpx 0;
+  opacity: 0.7;
+  transition: opacity 0.2s;
 }
+.menu-icon:active { opacity: 1; }
 .bar {
-  height: 3rpx;
-  background-color: #4b5563;
+  height: 4rpx;
+  background-color: #334155;
   border-radius: 4rpx;
 }
 .w-full { width: 100%; }
 .w-half { width: 60%; }
-.top-logo { font-size: 32rpx; font-weight: bold; color: #1a1a1a; flex: 1; text-align: center; margin-right: 74rpx; }
+.top-logo { 
+  font-size: 34rpx; 
+  font-weight: 700; 
+  color: #0f172a; 
+  flex: 1; 
+  text-align: center; 
+  margin-right: 76rpx;
+  letter-spacing: -0.5rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .placeholder-box { width: 44rpx; display: none; }
 
 .empty-state {
@@ -581,98 +711,110 @@ const toggleLike = (index: number) => {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
+  justify-content: center;
 }
 
 .hero {
-  padding: 60rpx 40rpx 40rpx;
+  padding: 0 48rpx 60rpx;
   text-align: center;
 }
 .h1 {
-  font-size: 52rpx;
+  font-size: 56rpx;
   font-weight: 800;
-  color: #1a1a1a;
-  margin-bottom: 16rpx;
-  letter-spacing: -1rpx;
+  color: #0f172a;
+  margin-bottom: 20rpx;
+  letter-spacing: -2rpx;
+  line-height: 1.1;
 }
 .hero .p {
-  color: #666;
-  font-size: 28rpx;
+  color: #64748b;
+  font-size: 30rpx;
   margin-bottom: 40rpx;
-  opacity: 0.8;
-}
-.categories {
-  display: flex;
-  justify-content: center;
-  gap: 20rpx;
-  flex-wrap: wrap;
-}
-.cat-chip {
-  background-color: #fff;
-  border: 1rpx solid #e5e7eb;
-  padding: 12rpx 32rpx;
-  border-radius: 100rpx;
-  font-size: 24rpx;
-  color: #4b5563;
-  box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.02);
+  font-weight: 400;
 }
 
 .section-title {
-  font-size: 24rpx;
-  color: #999;
+  font-size: 22rpx;
+  color: #94a3b8;
   text-transform: uppercase;
-  letter-spacing: 2rpx;
-  margin: 40rpx 40rpx 10rpx;
-  font-weight: 600;
+  letter-spacing: 4rpx;
+  margin: 40rpx 48rpx 16rpx;
+  font-weight: 700;
 }
 
 .suggestions {
-  flex: 1;
-  padding: 0 40rpx;
+  max-height: 40vh;
+  padding: 0 48rpx;
 }
 .card {
-  background-color: #fff;
+  background-color: rgba(255, 255, 255, 0.8);
   border-radius: 28rpx;
   padding: 32rpx 40rpx;
-  margin-bottom: 16rpx;
+  margin-bottom: 20rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border: 1rpx solid rgba(0,0,0,0.02);
-  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.02);
+  border: 1rpx solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.04);
+  transition: transform 0.2s;
+}
+.card:active {
+  transform: scale(0.98);
 }
 .card-title {
   flex: 1;
-  font-size: 28rpx;
+  font-size: 30rpx;
   font-weight: 500;
-  color: #374151;
+  color: #334155;
+  line-height: 1.5;
 }
 
 .chat-content {
   flex: 1;
   padding: 20rpx 40rpx;
-  overflow: hidden;
 }
 
 .msg-item {
-  margin-bottom: 40rpx;
+  margin-bottom: 48rpx;
 }
 
-.user-msg-row { display: flex; justify-content: flex-end; margin-bottom: 40rpx; }
-.user-msg { max-width: 85%; background-color: #1a73e8; color: white; padding: 24rpx 36rpx; border-radius: 32rpx 32rpx 4rpx 32rpx; font-size: 30rpx; }
+.user-msg-row { display: flex; justify-content: flex-end; margin-bottom: 48rpx; }
+.user-msg { 
+  max-width: 85%; 
+  background: linear-gradient(135deg, #1d4ed8 0%, #1a73e8 100%); 
+  color: white; 
+  padding: 30rpx 40rpx; 
+  border-radius: 40rpx 40rpx 8rpx 40rpx; 
+  font-size: 30rpx;
+  box-shadow: 0 8rpx 24rpx rgba(26, 115, 232, 0.2);
+  line-height: 1.5;
+  user-select: text;
+  -webkit-user-select: text;
+}
 
-.ai-msg-row { display: flex; flex-direction: column; align-items: flex-start; gap: 16rpx; margin-bottom: 48rpx; width: 100%; }
+.ai-msg-row { display: flex; flex-direction: column; align-items: flex-start; gap: 20rpx; margin-bottom: 56rpx; width: 100%; }
 .avatar { 
-  width: 80rpx; 
-  height: 80rpx; 
-  background-color: #f0f7ff;
-  border-radius: 16rpx;
+  width: 72rpx; 
+  height: 72rpx; 
+  background-color: #ffffff;
+  border-radius: 20rpx;
   display: flex; 
   align-items: center; 
   justify-content: center; 
   flex-shrink: 0; 
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.05);
 }
-.ai-content-box { width: 100%; }
-.ai-msg { background-color: #fff; padding: 28rpx 36rpx; border-radius: 4rpx 28rpx 28rpx 28rpx; box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.05); border: 1rpx solid #f0f0f0; width: 100%; box-sizing: border-box; }
+.ai-content-box { width: auto; max-width: 92%; }
+.ai-msg { 
+  background-color: #fff; 
+  padding: 36rpx 44rpx; 
+  border-radius: 8rpx 36rpx 36rpx 36rpx; 
+  box-shadow: 0 4rpx 24rpx rgba(0,0,0,0.05); 
+  border: 1rpx solid rgba(0,0,0,0.02); 
+  box-sizing: border-box; 
+  user-select: text;
+  -webkit-user-select: text;
+}
 
 /* Markdown Body Enhancements */
 .markdown-body {
@@ -701,57 +843,93 @@ const toggleLike = (index: number) => {
   margin-bottom: 8rpx;
 }
 
-/* TABLE STYLES - CRITICAL FIX */
+:deep(.markdown-body blockquote) {
+  margin: 16rpx 0;
+  padding: 16rpx 32rpx;
+  background-color: #f8fafc;
+  border-left: 8rpx solid #e2e8f0;
+  color: #64748b;
+  font-style: italic;
+  border-radius: 4rpx;
+}
+
+/* Link styling */
+:deep(.markdown-body a) {
+  color: #1a73e8;
+  text-decoration: none;
+  border-bottom: 2rpx solid #1a73e8;
+  padding: 0 4rpx;
+  font-weight: 500;
+}
+
+:deep(.markdown-footer-refs) {
+  display: none !important;
+}
+
+/* TABLE STYLES - Consolidated and Improved */
 :deep(.markdown-body table) {
-  width: 100% !important;
+  width: 100%;
+  display: block;
+  overflow-x: auto;
   border-collapse: collapse;
-  margin: 20rpx 0;
+  margin: 24rpx 0;
   font-size: 24rpx;
   background-color: #fff;
-  border: 1rpx solid #e5e7eb;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 8rpx;
+  -webkit-overflow-scrolling: touch;
+}
+
+:deep(.markdown-body thead) {
+  display: table-header-group;
+  width: 100%;
+}
+
+:deep(.markdown-body tbody) {
+  display: table-row-group;
+  width: 100%;
+}
+
+:deep(.markdown-body tr) {
+  display: table-row;
+  width: 100%;
 }
 
 :deep(.markdown-body th),
 :deep(.markdown-body td) {
-  border: 1rpx solid #e5e7eb;
-  padding: 12rpx 16rpx;
+  display: table-cell;
+  border: 1rpx solid #e2e8f0;
+  padding: 16rpx 20rpx;
   text-align: left;
+  line-height: 1.4;
+  min-width: 120rpx;
 }
 
 :deep(.markdown-body th) {
-  background-color: #f9fafb;
-  font-weight: bold;
-  color: #374151;
+  background-color: #f8fafc;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
 }
 
 :deep(.markdown-body tr:nth-child(even)) {
-  background-color: #fbfbfb;
+  background-color: #f9fafb;
 }
 
-.raw-content-view {
-  background-color: #1e293b;
-  padding: 24rpx;
-  border-radius: 12rpx;
-  margin: 16rpx 0;
-  border: 1rpx solid #334155;
-  box-shadow: inset 0 2rpx 8rpx rgba(0,0,0,0.2);
+:deep(.markdown-body tr:hover) {
+  background-color: #f1f5f9;
 }
-.raw-text-content {
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 24rpx;
-  color: #e2e8f0;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
+
+
 
 /* Citation Tags Styling - GPT Bubble Style */
-:deep(.citation-tag) {
+:deep(.citation-tag),
+:deep(.citation-link) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background-color: #f1f5f9;
-  color: #64748b;
+  color: #1a73e8;
   font-size: 16rpx;
   min-width: 24rpx;
   height: 24rpx;
@@ -759,22 +937,109 @@ const toggleLike = (index: number) => {
   margin: 0 4rpx;
   vertical-align: super;
   font-weight: 700;
-  border: 1rpx solid #e2e8f0;
+  border: 1rpx solid rgba(26, 115, 232, 0.2);
   padding: 0 2rpx;
   line-height: 1;
+  text-decoration: underline;
 }
 
-/* Sources Footer Styling - GPT Source Cards */
+:deep(.citation-link) {
+  cursor: pointer;
+  background-color: #eff6ff;
+  border-color: #3b82f6;
+}
+
+:deep(.citation-link:active) {
+  opacity: 0.7;
+  transform: scale(0.9);
+}
+
+/* Sources Footer Styling */
 .sources-footer {
   margin-top: 24rpx;
-  padding-top: 24rpx;
+  padding-top: 16rpx;
   border-top: 1rpx solid #f1f5f9;
 }
 
-.sources-list {
+.sources-header {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  padding: 8rpx 0;
+  cursor: pointer;
+}
+
+.sources-header-left {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.sources-title {
+  font-size: 26rpx;
+  color: #1a73e8;
+  font-weight: 600;
+}
+
+.sources-count-badge {
+  font-size: 18rpx;
+  color: #1a73e8;
+  background: #eff6ff;
+  padding: 2rpx 12rpx;
+  border-radius: 20rpx;
+  margin-left: 8rpx;
+  border: 1rpx solid rgba(26, 115, 232, 0.1);
+}
+
+.sources-header:active {
+  background-color: #f0f7ff;
+  border-radius: 12rpx;
+}
+
+.sources-content-list {
+  padding: 12rpx 0 8rpx 40rpx;
+  display: flex;
+  flex-direction: column;
   gap: 16rpx;
+}
+
+.source-link-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  padding: 12rpx 0;
+  border-bottom: 1rpx solid #f8fafc;
+}
+
+.source-link-item:last-child {
+  border-bottom: none;
+}
+
+.source-no {
+  font-size: 20rpx;
+  color: #94a3b8;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 4rpx;
+  background: #f1f5f9;
+  padding: 2rpx 8rpx;
+  border-radius: 4rpx;
+}
+
+.source-label {
+  flex: 1;
+  font-size: 24rpx;
+  color: #475569;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.source-label.clickable-link {
+  color: #1a73e8 !important;
+  text-decoration: underline !important;
+}
+
+.source-link-item:active {
+  opacity: 0.7;
 }
 
 .source-pill {
@@ -788,6 +1053,15 @@ const toggleLike = (index: number) => {
   transition: all 0.2s ease;
   box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.02);
   gap: 8rpx;
+}
+
+.source-pill.has-link {
+  border-color: rgba(26,115,232,0.2);
+  background-color: #f8fbff;
+}
+
+.source-pill.has-link .pill-name {
+  color: #1a73e8;
 }
 
 .source-pill:active {
@@ -814,6 +1088,15 @@ const toggleLike = (index: number) => {
   font-weight: 500;
 }
 
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 :deep(blockquote) {
   border-left: 8rpx solid #e5e7eb;
   padding-left: 24rpx;
@@ -826,37 +1109,12 @@ const toggleLike = (index: number) => {
 }
 .rich-text .p { font-size: 28rpx; line-height: 1.6; color: #333; word-break: break-all; margin-bottom: 16rpx; }
 
-/* Markdown Table Styles */
-:deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 20rpx 0;
-  font-size: 24rpx;
-  background-color: #fff;
-  border: 1rpx solid #e2e8f0;
-  border-radius: 8rpx;
-  overflow: hidden;
-}
-:deep(th), :deep(td) {
-  padding: 16rpx 20rpx;
-  border: 1rpx solid #e2e8f0;
-  text-align: left;
-}
-:deep(th) {
-  background-color: #f8fafc;
-  font-weight: 600;
-  color: #475569;
-}
-:deep(tr:nth-child(even)) {
-  background-color: #fafafa;
-}
-
 /* List Styles */
-:deep(ul), :deep(ol) {
+:deep(.markdown-body ul), :deep(.markdown-body ol) {
   padding-left: 40rpx;
   margin: 16rpx 0;
 }
-:deep(li) {
+:deep(.markdown-body li) {
   margin-bottom: 8rpx;
   color: #333;
 }
@@ -871,16 +1129,23 @@ const toggleLike = (index: number) => {
   display: inline-flex;
   align-items: center;
   background-color: #f0f7ff;
-  padding: 12rpx 24rpx;
+  padding: 16rpx 28rpx;
   border-radius: 100rpx;
-  margin-top: 20rpx;
+  margin-top: 24rpx;
   border: 1rpx solid #dbeafe;
+  box-shadow: 0 4rpx 15rpx rgba(26,115,232,0.1);
+  animation: bg-pulse 2s infinite ease-in-out;
+}
+@keyframes bg-pulse {
+  0% { background-color: #f0f7ff; }
+  50% { background-color: #e0f0ff; }
+  100% { background-color: #f0f7ff; }
 }
 .search-icon-box {
-  margin-right: 12rpx;
+  margin-right: 16rpx;
   display: flex;
   align-items: center;
-  animation: spin 2s linear infinite;
+  animation: spin 1s linear infinite;
 }
 @keyframes spin {
   from { transform: rotate(0deg); }
@@ -898,11 +1163,11 @@ const toggleLike = (index: number) => {
   align-items: center;
 }
 .dot {
-  width: 8rpx;
-  height: 8rpx;
+  width: 10rpx;
+  height: 10rpx;
   background-color: #1a73e8;
   border-radius: 50%;
-  animation: dot-bounce 1.4s infinite ease-in-out both;
+  animation: dot-bounce 1s infinite ease-in-out both;
 }
 .dot:nth-child(1) { animation-delay: -0.32s; }
 .dot:nth-child(2) { animation-delay: -0.16s; }
@@ -912,7 +1177,7 @@ const toggleLike = (index: number) => {
   40% { transform: scale(1.0); }
 }
 
-.interact-bar { display: flex; gap: 40rpx; margin-top: 24rpx; padding-top: 24rpx; border-top: 1rpx solid #f0f0f0; }
+.interact-bar { display: flex; gap: 32rpx; margin-top: 16rpx; padding-top: 16rpx; border-top: 1rpx solid #f8fafc; }
 .interact-btn { display: flex; align-items: center; gap: 12rpx; color: rgba(0,0,0,0.4); transition: all 0.2s; }
 .interact-btn.active { color: #1a73e8; font-weight: bold; transform: scale(1.05); }
 .btn-txt { font-size: 24rpx; }
@@ -1039,55 +1304,85 @@ const toggleLike = (index: number) => {
 }
 
 .input-bar-container {
-  padding: 30rpx 40rpx calc(60rpx + env(safe-area-inset-bottom));
-  background-color: #f6f6f6;
+  padding: 24rpx 32rpx;
+  background-color: transparent;
+  position: relative;
+  z-index: 100;
 }
 .input-bar {
-  background-color: #fff;
-  height: 110rpx;
-  border-radius: 60rpx;
   display: flex;
   align-items: center;
-  padding: 0 30rpx;
-  border: 1rpx solid #eee;
-  box-shadow: 0 8rpx 30rpx rgba(0,0,0,0.05);
+  background-color: #fff;
+  border-radius: 40rpx;
+  padding: 12rpx 12rpx 12rpx 40rpx;
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.08);
+  border: 1rpx solid rgba(0,0,0,0.01);
 }
 .flex-1 { flex: 1; }
 .px-2 { padding: 0 20rpx; }
-.text-input { font-size: 30rpx; height: 80rpx; }
+.text-input { font-size: 30rpx; height: 80rpx; color: #1e293b; }
 .right-actions {
   display: flex;
   align-items: center;
 }
-.send-btn {
-  background-color: #f0f0f0;
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
+.ai-disclaimer {
+  text-align: center;
+  font-size: 20rpx;
+  color: #94a3b8;
+  margin-top: 16rpx;
+  opacity: 0.6;
+}
+.send-btn { 
+  width: 80rpx; 
+  height: 80rpx; 
+  border-radius: 50%; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  background-color: #f1f5f9;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+.btn-active { 
+  background: linear-gradient(135deg, #1d4ed8 0%, #1a73e8 100%);
+  box-shadow: 0 4rpx 12rpx rgba(26, 115, 232, 0.3);
+}
+.btn-active:active {
+  transform: scale(0.9);
 }
 .send-btn.btn-loading {
   background-color: #1a73e8;
   position: relative;
 }
+.send-btn.btn-loading::before {
+  content: '';
+  position: absolute;
+  width: 20rpx;
+  height: 20rpx;
+  background-color: #fff;
+  border-radius: 4rpx;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
 .send-btn.btn-loading::after {
   content: '';
   position: absolute;
-  width: 100%;
-  height: 100%;
-  border: 4rpx solid rgba(255, 255, 255, 0.3);
+  width: 56rpx;
+  height: 56rpx;
+  top: 12rpx;
+  left: 12rpx;
+  border: 4rpx solid rgba(255, 255, 255, 0.2);
   border-top-color: #fff;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.8s linear infinite;
   box-sizing: border-box;
 }
 .send-btn.btn-active {
   background-color: #1a73e8;
 }
-.send-btn:not(.btn-loading) .app-icon {
+.send-btn .send-icon {
   transform: rotate(-45deg);
   margin-left: 4rpx;
   margin-top: -4rpx;

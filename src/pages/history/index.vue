@@ -29,16 +29,16 @@
         @contextmenu.prevent
       >
         <view class="item-left">
-          <AppIcon name="chat" size="32" color="#1a73e8" />
+          <AppIcon name="chat" size="40" color="#1a73e8" />
           <text class="item-title">{{ item.title }}</text>
         </view>
-        <AppIcon name="chevron_right" size="28" color="#ccc" />
+        <AppIcon name="chevron_right" size="32" color="#ccc" />
       </view>
     </scroll-view>
 
     <!-- Empty State -->
     <view v-else class="empty-list">
-      <AppIcon name="history" size="120" color="#e5e7eb" />
+      <AppIcon name="history" size="140" color="#e5e7eb" />
       <text class="empty-text">暂无历史记录</text>
     </view>
   </view>
@@ -126,7 +126,7 @@ const confirmDelete = (index: number) => {
   display: flex; 
   align-items: center; 
   justify-content: space-between; 
-  padding-top: calc(60rpx + env(safe-area-inset-top));
+  padding-top: calc(var(--status-bar-height) + 40rpx);
   padding-left: 30rpx;
   padding-right: 40rpx;
   padding-bottom: 20rpx;
@@ -134,25 +134,25 @@ const confirmDelete = (index: number) => {
   border-bottom: 1rpx solid #eee;
 }
 .left-actions { display: flex; align-items: center; gap: 10rpx; }
-.title { font-size: 32rpx; font-weight: bold; color: #1a1a1a; }
+.title { font-size: 34rpx; font-weight: bold; color: #1a1a1a; }
 .reset-btn { font-size: 24rpx; color: #999; margin-left: 20rpx; text-decoration: underline; }
 .clear-all { font-size: 24rpx; color: #999; }
 
-.list { flex: 1; padding: 20rpx 30rpx; }
+.list { flex: 1; padding: 100rpx 30rpx 24rpx; }
 .item {
   background: #fff;
-  border-radius: 28rpx;
-  padding: 32rpx 32rpx;
-  margin-bottom: 16rpx;
+  border-radius: 32rpx;
+  padding: 40rpx 36rpx;
+  margin-bottom: 24rpx;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.03);
+  box-shadow: 0 6rpx 20rpx rgba(0,0,0,0.05);
   transition: all 0.15s ease;
 }
 .item-active { transform: scale(0.98); background-color: #fafafa; }
-.item-left { display: flex; align-items: center; gap: 20rpx; flex: 1; overflow: hidden; }
-.item-title { font-size: 28rpx; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-left { display: flex; align-items: center; gap: 24rpx; flex: 1; overflow: hidden; }
+.item-title { font-size: 32rpx; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .empty-list {
   flex: 1;
@@ -160,7 +160,7 @@ const confirmDelete = (index: number) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20rpx;
+  gap: 30rpx;
 }
-.empty-text { font-size: 28rpx; color: #ccc; }
+.empty-text { font-size: 32rpx; color: #ccc; }
 </style>
