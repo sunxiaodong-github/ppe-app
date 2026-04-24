@@ -3,13 +3,14 @@
     <view class="header">
       <view class="left-actions">
         <AppIcon name="chevron_left" size="44" color="#4b5563" @click="back" />
-        <text class="title">历史记录</text>
+      </view>
+      <view class="header-title">历史会话</view>
+      <view class="right-actions">
         <text 
           class="reset-btn"
           @click="resetAgreement"
-        >重置体验</text>
+        >重置</text>
       </view>
-      <view class="placeholder-box"></view>
     </view>
 
     <!-- List -->
@@ -125,20 +126,41 @@ const confirmDelete = (index: number) => {
 .header { 
   display: flex; 
   align-items: center; 
-  justify-content: space-between; 
-  padding-top: calc(var(--status-bar-height) + 40rpx);
-  padding-left: 30rpx;
-  padding-right: 40rpx;
-  padding-bottom: 20rpx;
-  background-color: #fff;
-  border-bottom: 1rpx solid #eee;
+  justify-content: center; 
+  padding-top: calc(var(--status-bar-height) + env(safe-area-inset-top) + 160rpx);
+  padding-left: 48rpx;
+  padding-right: 48rpx;
+  padding-bottom: 30rpx;
+  background-color: transparent;
+  position: relative;
+  height: 60rpx;
 }
-.left-actions { display: flex; align-items: center; gap: 10rpx; }
-.title { font-size: 34rpx; font-weight: bold; color: #1a1a1a; }
-.reset-btn { font-size: 24rpx; color: #999; margin-left: 20rpx; text-decoration: underline; }
+.left-actions { 
+  display: flex; 
+  align-items: center; 
+  position: absolute;
+  left: 48rpx;
+  height: 60rpx;
+}
+.header-title { 
+  font-size: 34rpx; 
+  font-weight: 700; 
+  color: #0f172a; 
+  letter-spacing: -0.5rpx;
+  white-space: nowrap;
+  text-align: center;
+}
+.right-actions {
+  position: absolute;
+  right: 48rpx;
+  display: flex;
+  align-items: center;
+  height: 60rpx;
+}
+.reset-btn { font-size: 24rpx; color: #94a3b8; text-decoration: none; border: 1rpx solid #e2e8f0; padding: 4rpx 16rpx; border-radius: 20rpx; }
 .clear-all { font-size: 24rpx; color: #999; }
 
-.list { flex: 1; padding: 100rpx 30rpx 24rpx; }
+.list { flex: 1; padding: 80rpx 30rpx 24rpx; }
 .item {
   background: #fff;
   border-radius: 32rpx;

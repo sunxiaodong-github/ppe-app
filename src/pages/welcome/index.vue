@@ -49,6 +49,7 @@
       class="chat-content" 
       scroll-y 
       :scroll-top="chatScrollTop"
+      :scroll-into-view="scrollIntoView"
       :scroll-with-animation="true"
     >
       <view v-for="(msg, index) in messages" :key="index" class="msg-item">
@@ -138,11 +139,11 @@
             </view>
           </view>
         </view>
-      <view class="scroll-anchor"></view>
+      <view id="scroll-anchor" class="scroll-anchor"></view>
     </scroll-view>
 
     <!-- Input Bar -->
-    <view class="input-bar-container">
+    <view class="input-bar-container" :style="{ paddingBottom: keyboardHeight > 0 ? (keyboardHeight + 10) + 'px' : 'calc(24rpx + env(safe-area-inset-bottom))' }">
       <view class="input-bar">
         <textarea 
           v-model="inputValue"
@@ -151,10 +152,11 @@
           auto-height
           :maxlength="-1"
           :cursor-spacing="30"
-          :adjust-position="true"
+          :adjust-position="false"
           :disabled="isStreaming"
           @confirm="handleSend"
           @focus="scrollToBottom(true)"
+          @keyboardheightchange="onKeyboardHeightChange"
         />
         <view class="right-actions">
           <view 
@@ -230,8 +232,17 @@ const md = new MarkdownIt({
 
 const inputValue = ref('');
 const chatScrollTop = ref(0);
+const scrollIntoView = ref('');
 const isStreaming = ref(false);
 const isMounted = ref(false);
+const keyboardHeight = ref(0);
+
+const onKeyboardHeightChange = (e: any) => {
+  keyboardHeight.value = e.detail.height;
+  if (e.detail.height > 0) {
+    scrollToBottom(true);
+  }
+};
 
 const messages = ref<any[]>([]);
 
@@ -249,12 +260,16 @@ let lastScrollTime = 0;
 const scrollToBottom = (force = false) => {
   if (!isMounted.value || messages.value.length === 0) return;
   const now = Date.now();
-  if (!force && now - lastScrollTime < 100) return; // Slightly faster scroll for smooth streaming
+  if (!force && now - lastScrollTime < 50) return; // Faster scroll for smooth streaming
   lastScrollTime = now;
   
   nextTick(() => {
     if (isMounted.value && messages.value.length > 0) {
       chatScrollTop.value = 99999 + Math.random();
+      scrollIntoView.value = '';
+      setTimeout(() => {
+        scrollIntoView.value = 'scroll-anchor';
+      }, 50);
     }
   });
 };
@@ -654,23 +669,32 @@ const openSource = (source: SourceInfo) => {
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 .header {
-  padding-top: calc(var(--status-bar-height) + 40rpx);
+  padding-top: calc(var(--status-bar-height) + env(safe-area-inset-top) + 160rpx);
   padding-left: 48rpx;
   padding-right: 48rpx;
   padding-bottom: 30rpx;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   background: transparent;
   z-index: 10;
+  position: relative;
+  height: 60rpx;
 }
-.left-actions { display: flex; align-items: center; gap: 32rpx; }
+.left-actions { 
+  display: flex; 
+  align-items: center; 
+  gap: 32rpx;
+  position: absolute;
+  left: 48rpx;
+  height: 60rpx;
+}
 .menu-icon {
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
+  justify-content: space-between;
   width: 44rpx;
-  padding: 10rpx 0;
+  height: 30rpx;
   opacity: 0.7;
   transition: opacity 0.2s;
 }
@@ -686,13 +710,12 @@ const openSource = (source: SourceInfo) => {
   font-size: 34rpx; 
   font-weight: 700; 
   color: #0f172a; 
-  flex: 1; 
-  text-align: center; 
-  margin-right: 76rpx;
   letter-spacing: -0.5rpx;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 400rpx;
+  text-align: center;
 }
 .placeholder-box { width: 44rpx; display: none; }
 
@@ -1288,7 +1311,7 @@ const openSource = (source: SourceInfo) => {
 }
 
 .input-bar-container {
-  padding: 20rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  padding: 20rpx 32rpx 0;
   background-color: transparent;
   position: relative;
   z-index: 100;
