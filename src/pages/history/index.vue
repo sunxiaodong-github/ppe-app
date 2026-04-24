@@ -2,7 +2,7 @@
   <view class="container">
     <view class="header">
       <view class="left-actions">
-        <AppIcon name="chevron_left" size="44" color="#4b5563" @click="back" />
+        <AppIcon name="chevron_left" size="64" color="#4b5563" @click="back" />
       </view>
       <view class="header-title">历史会话</view>
       <view class="right-actions">
@@ -133,14 +133,14 @@ const confirmDelete = (index: number) => {
   padding-bottom: 30rpx;
   background-color: transparent;
   position: relative;
-  height: 60rpx;
+  height: 80rpx;
 }
 .left-actions { 
   display: flex; 
   align-items: center; 
   position: absolute;
   left: 48rpx;
-  height: 60rpx;
+  height: 80rpx;
 }
 .header-title { 
   font-size: 34rpx; 
@@ -155,7 +155,7 @@ const confirmDelete = (index: number) => {
   right: 48rpx;
   display: flex;
   align-items: center;
-  height: 60rpx;
+  height: 80rpx;
 }
 .reset-btn { font-size: 24rpx; color: #94a3b8; text-decoration: none; border: 1rpx solid #e2e8f0; padding: 4rpx 16rpx; border-radius: 20rpx; }
 .clear-all { font-size: 24rpx; color: #999; }

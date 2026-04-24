@@ -12,7 +12,7 @@
         <AppIcon 
           v-if="messages.length > 0" 
           name="add_comment" 
-          size="44" 
+          size="60" 
           color="#4b5563"
           @click="resetChat" 
         />
@@ -68,7 +68,7 @@
           <view class="ai-content-box" :class="{ 'is-streaming': isStreaming && index === messages.length - 1 }">
             <view class="ai-msg">
               <view class="rich-text">
-                <view class="markdown-body" v-html="renderMarkdown(msg.content)"></view>
+                <view class="markdown-body" v-html="renderMarkdown(msg.content)" @click="handleMarkdownClick"></view>
                 
                 <!-- Sources Section: Refined Citations -->
                 <view v-if="getDetailedSources(msg.content).length > 0" class="sources-footer">
@@ -123,8 +123,8 @@
 
               </view>
                 
-              <!-- Searching status -->
-              <view v-if="isStreaming && index === messages.length - 1" class="searching-status">
+              <!-- Searching status: only show when message is empty and streaming -->
+              <view v-if="isStreaming && index === messages.length - 1 && !msg.content" class="searching-status">
                   <view class="search-icon-box">
                     <AppIcon name="search" size="24" color="#1a73e8" />
                   </view>
@@ -139,11 +139,15 @@
             </view>
           </view>
         </view>
-      <view id="scroll-anchor" class="scroll-anchor"></view>
+      <view id="scroll-anchor" class="scroll-anchor" style="height: 1px;"></view>
+      <view class="bottom-spacer" style="height: 40rpx;"></view>
     </scroll-view>
 
     <!-- Input Bar -->
-    <view class="input-bar-container" :style="{ paddingBottom: keyboardHeight > 0 ? (keyboardHeight + 10) + 'px' : 'calc(24rpx + env(safe-area-inset-bottom))' }">
+    <view 
+      class="input-bar-container" 
+      :style="{ paddingBottom: keyboardHeight > 0 ? keyboardHeight + 'px' : 'env(safe-area-inset-bottom)' }"
+    >
       <view class="input-bar">
         <textarea 
           v-model="inputValue"
@@ -151,11 +155,11 @@
           placeholder="有问题，尽管问我..."
           auto-height
           :maxlength="-1"
-          :cursor-spacing="30"
+          :cursor-spacing="20"
           :adjust-position="false"
           :disabled="isStreaming"
           @confirm="handleSend"
-          @focus="scrollToBottom(true)"
+          @focus="onInputFocus"
           @keyboardheightchange="onKeyboardHeightChange"
         />
         <view class="right-actions">
@@ -171,7 +175,7 @@
               v-if="!isStreaming"
               class="send-icon"
               name="send" 
-              size="40" 
+              size="48" 
               :color="inputValue.trim() ? '#fff' : '#d1d5db'" 
               fill 
             />
@@ -238,10 +242,18 @@ const isMounted = ref(false);
 const keyboardHeight = ref(0);
 
 const onKeyboardHeightChange = (e: any) => {
-  keyboardHeight.value = e.detail.height;
-  if (e.detail.height > 0) {
+  const height = e.detail.height || 0;
+  keyboardHeight.value = height;
+  if (height > 0) {
     scrollToBottom(true);
   }
+};
+
+const onInputFocus = () => {
+  // Use a slight delay to ensure the keyboard has started appearing
+  setTimeout(() => {
+    scrollToBottom(true);
+  }, 100);
 };
 
 const messages = ref<any[]>([]);
@@ -260,17 +272,16 @@ let lastScrollTime = 0;
 const scrollToBottom = (force = false) => {
   if (!isMounted.value || messages.value.length === 0) return;
   const now = Date.now();
-  if (!force && now - lastScrollTime < 50) return; // Faster scroll for smooth streaming
+  if (!force && now - lastScrollTime < 100) return; 
   lastScrollTime = now;
   
   nextTick(() => {
-    if (isMounted.value && messages.value.length > 0) {
-      chatScrollTop.value = 99999 + Math.random();
-      scrollIntoView.value = '';
-      setTimeout(() => {
-        scrollIntoView.value = 'scroll-anchor';
-      }, 50);
-    }
+    // Dual approach for best platform compatibility
+    chatScrollTop.value = 200000 + Math.random();
+    scrollIntoView.value = '';
+    nextTick(() => {
+      scrollIntoView.value = 'scroll-anchor';
+    });
   });
 };
 
@@ -644,19 +655,44 @@ const toggleSources = (index: number) => {
 
 
 
+const openLink = (url: string) => {
+  if (!url) return;
+  // #ifdef H5
+  window.open(url, '_blank');
+  // #endif
+  // #ifndef H5
+  uni.setClipboardData({
+    data: url,
+    success: () => {
+      uni.showToast({ title: '链接已复制，请在浏览器中访问', icon: 'none' });
+    }
+  });
+  // #endif
+};
+
 const openSource = (source: SourceInfo) => {
   if (source.url) {
-    // #ifdef H5
-    window.open(source.url, '_blank');
-    // #endif
-    // #ifndef H5
-    uni.setClipboardData({
-      data: source.url,
-      success: () => {
-        uni.showToast({ title: '链接已复制，请在浏览器中访问', icon: 'none' });
-      }
-    });
-    // #endif
+    openLink(source.url);
+  }
+};
+
+const handleMarkdownClick = (e: any) => {
+  // Delegate clicks to links
+  let target = e.target;
+  // Walk up to find A tag (could be clicking a span inside A)
+  while (target && target.tagName !== 'A') {
+    target = target.parentNode;
+  }
+  
+  if (target && target.tagName === 'A' && target.href) {
+    // Check if it's a citation link or standard link
+    const href = target.getAttribute('href');
+    if (href) {
+      // Prevent default and use our opener
+      // This is especially needed in uni-app v-html to ensure target="_blank" behavior
+      // and platform compatibility
+      openLink(href);
+    }
   }
 };
 </script>
@@ -679,7 +715,7 @@ const openSource = (source: SourceInfo) => {
   background: transparent;
   z-index: 10;
   position: relative;
-  height: 60rpx;
+  height: 80rpx;
 }
 .left-actions { 
   display: flex; 
@@ -687,22 +723,24 @@ const openSource = (source: SourceInfo) => {
   gap: 32rpx;
   position: absolute;
   left: 48rpx;
-  height: 60rpx;
+  height: 80rpx;
+  z-index: 11;
 }
 .menu-icon {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  width: 44rpx;
-  height: 30rpx;
+  width: 60rpx;
+  height: 40rpx;
   opacity: 0.7;
   transition: opacity 0.2s;
+  flex-shrink: 0;
 }
 .menu-icon:active { opacity: 1; }
 .bar {
-  height: 4rpx;
+  height: 7rpx;
   background-color: #334155;
-  border-radius: 4rpx;
+  border-radius: 7rpx;
 }
 .w-full { width: 100%; }
 .w-half { width: 60%; }
@@ -714,8 +752,9 @@ const openSource = (source: SourceInfo) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 400rpx;
+  max-width: 350rpx;
   text-align: center;
+  margin: 0 auto;
 }
 .placeholder-box { width: 44rpx; display: none; }
 
@@ -724,11 +763,12 @@ const openSource = (source: SourceInfo) => {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  justify-content: center;
+  justify-content: flex-start;
+  padding-top: 120rpx;
 }
 
 .hero {
-  padding: 0 48rpx 32rpx;
+  padding: 60rpx 48rpx 32rpx;
   text-align: center;
 }
 .h1 {
@@ -935,35 +975,33 @@ const openSource = (source: SourceInfo) => {
 
 
 
-/* Citation Tags Styling - GPT Bubble Style */
+/* Citation Tags Styling - Minimalist Grey Style */
 :deep(.citation-tag),
 :deep(.citation-link) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background-color: #f1f5f9;
-  color: #1a73e8;
+  color: #64748b;
   font-size: 16rpx;
-  min-width: 24rpx;
-  height: 24rpx;
+  min-width: 26rpx;
+  height: 26rpx;
   border-radius: 50%;
   margin: 0 4rpx;
   vertical-align: super;
-  font-weight: 700;
-  border: 1rpx solid rgba(26, 115, 232, 0.2);
+  font-weight: 600;
+  border: 1rpx solid #e2e8f0;
   padding: 0 2rpx;
   line-height: 1;
-  text-decoration: underline;
 }
 
 :deep(.citation-link) {
   cursor: pointer;
-  background-color: #eff6ff;
-  border-color: #3b82f6;
+  background-color: #f8fafc;
 }
 
 :deep(.citation-link:active) {
-  opacity: 0.7;
+  background-color: #e2e8f0;
   transform: scale(0.9);
 }
 
@@ -1139,15 +1177,18 @@ const openSource = (source: SourceInfo) => {
   position: relative;
 }
 
-.is-streaming .markdown-body p:last-child::after {
+.is-streaming .markdown-body > *:last-child::after,
+.is-streaming .markdown-body li:last-child::after {
   content: '';
   display: inline-block;
-  width: 4rpx;
-  height: 1.2em;
+  width: 12rpx;
+  height: 12rpx;
   background-color: #1a73e8;
   margin-left: 8rpx;
   vertical-align: middle;
+  border-radius: 50%;
   animation: cursor-blink 0.8s infinite;
+  box-shadow: 0 0 8rpx rgba(26, 115, 232, 0.4);
 }
 
 @keyframes cursor-blink {
@@ -1315,24 +1356,25 @@ const openSource = (source: SourceInfo) => {
   background-color: transparent;
   position: relative;
   z-index: 100;
+  transition: padding-bottom 0.15s ease-out;
 }
 .input-bar {
   display: flex;
   align-items: center;
   background-color: #fff;
-  border-radius: 40rpx;
-  padding: 6rpx 6rpx 6rpx 24rpx;
+  border-radius: 48rpx;
+  padding: 10rpx 24rpx 10rpx 28rpx;
   box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.08);
   border: 1rpx solid rgba(0,0,0,0.01);
 }
 .flex-1 { flex: 1; }
 .px-2 { padding: 0 20rpx; }
 .text-input-area { 
-  min-height: 52rpx; 
+  min-height: 60rpx; 
   max-height: 300rpx; 
-  font-size: 26rpx; 
+  font-size: 30rpx; 
   color: #1e293b; 
-  padding: 10rpx 0;
+  padding: 10rpx 0 10rpx 16rpx;
   line-height: 1.5;
 }
 .right-actions {
@@ -1347,8 +1389,8 @@ const openSource = (source: SourceInfo) => {
   opacity: 0.6;
 }
 .send-btn { 
-  width: 64rpx; 
-  height: 64rpx; 
+  width: 72rpx; 
+  height: 72rpx; 
   border-radius: 50%; 
   display: flex; 
   align-items: center; 
