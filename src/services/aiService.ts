@@ -56,7 +56,7 @@ export function chatStream(
       }
     },
     fail: (err) => {
-      const errMsg = err.errMsg || (err.message ? err.message : '');
+      const errMsg = err.errMsg || '';
       if (errMsg.includes('abort') || errMsg.includes('BodyStreamBuffer was aborted')) {
         console.log('Request aborted');
         onComplete(fullText); // Complete with what we have

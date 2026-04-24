@@ -64,7 +64,7 @@
           <view class="avatar">
             <AppIcon name="security" size="52" color="#1a73e8" fill />
           </view>
-          <view class="ai-content-box">
+          <view class="ai-content-box" :class="{ 'is-streaming': isStreaming && index === messages.length - 1 }">
             <view class="ai-msg">
               <view class="rich-text">
                 <view class="markdown-body" v-html="renderMarkdown(msg.content)"></view>
@@ -111,16 +111,14 @@
                     <text class="btn-txt">赞同</text>
                   </view>
                   <view 
-                    class="interact-btn"
+                    class="interact-btn" 
                     :class="{ active: msg.interaction === 'feedbacked' }"
                     @click="goFeedback(index)"
                   >
                     <AppIcon name="thumb_down" size="24" :fill="msg.interaction === 'feedbacked'" :color="msg.interaction === 'feedbacked' ? '#1a73e8' : '#94a3b8'" />
                     <text class="btn-txt">反馈</text>
                   </view>
-
                 </view>
-
 
               </view>
                 
@@ -146,11 +144,12 @@
     <!-- Input Bar -->
     <view class="input-bar-container" :style="{ paddingBottom: keyboardHeight > 0 ? (keyboardHeight + 10) + 'px' : 'calc(40rpx + env(safe-area-inset-bottom))' }">
       <view class="input-bar">
-        <input 
+        <textarea 
           v-model="inputValue"
-          class="flex-1 px-2 text-input"
-          :placeholder="messages.length === 0 ? '有问题，尽管问我...' : '我也想问...'"
-          confirm-type="send"
+          class="flex-1 px-2 text-input-area"
+          placeholder="有问题，尽管问我..."
+          auto-height
+          :maxlength="-1"
           :cursor-spacing="20"
           :adjust-position="false"
           :disabled="isStreaming"
@@ -171,7 +170,7 @@
               class="send-icon"
               name="send" 
               size="40" 
-              :color="(inputValue.trim() || isStreaming) ? '#fff' : '#d1d5db'" 
+              :color="inputValue.trim() ? '#fff' : '#d1d5db'" 
               fill 
             />
           </view>
@@ -257,16 +256,14 @@ let lastScrollTime = 0;
 const scrollToBottom = (force = false) => {
   if (!isMounted.value || messages.value.length === 0) return;
   const now = Date.now();
-  if (!force && now - lastScrollTime < 150) return;
+  if (!force && now - lastScrollTime < 100) return; // Slightly faster scroll for smooth streaming
   lastScrollTime = now;
   
-  // Use a slightly longer delay to ensure the scroll-view is visible and initialized
-  setTimeout(() => {
+  nextTick(() => {
     if (isMounted.value && messages.value.length > 0) {
-      // Small random added to force the change detection even if value is same
-      chatScrollTop.value = 9999 + Math.random();
+      chatScrollTop.value = 99999 + Math.random();
     }
-  }, 200);
+  });
 };
 
 // Citation Tokens from Documentation
@@ -323,9 +320,9 @@ const renderMarkdown = (content: string) => {
   // 2b. Standard fallback citations: avoid breaking normal links [text](url)
   // We look for [n] or [n, m] where n, m are 1-2 digits, and it's NOT followed by ( or :
   processedContent = processedContent
-    .replace(/\[\^?((?:\d{1,2}\s*,\s*)*\d{1,2})\](?!\s*[\(:])/g, (match, ids) => {
-      const idList = ids.split(',').map(id => id.trim());
-      return idList.map(id => {
+    .replace(/\[\^?((?:\d{1,2}\s*,\s*)*\d{1,2})\](?!\s*[\(:])/g, (match, ids: string) => {
+      const idList = ids.split(',').map((id: string) => id.trim());
+      return idList.map((id: string) => {
         const source = sources.find(s => s.id === id);
         if (source && source.url) {
           return `<a href="${source.url}" target="_blank" class="citation-link">${id}</a>`;
@@ -333,10 +330,10 @@ const renderMarkdown = (content: string) => {
         return `<span class="citation-tag">${id}</span>`;
       }).join('');
     })
-    .replace(/【((?:\d{1,2}\s*,\s*)*\d{1,2})[†:]?[^】]*】/g, (match, ids) => {
+    .replace(/【((?:\d{1,2}\s*,\s*)*\d{1,2})[†:]?[^】]*】/g, (match, ids: string) => {
       // Handle the 【1, 2】 case too
-      const idList = ids.split(',').map(id => id.trim().replace(/[†:]/g, ''));
-      return idList.map(id => {
+      const idList = ids.split(',').map((id: string) => id.trim().replace(/[†:]/g, ''));
+      return idList.map((id: string) => {
         const source = sources.find(s => s.id === id);
         if (source && source.url) {
           return `<a href="${source.url}" target="_blank" class="citation-link">${id}</a>`;
@@ -715,7 +712,7 @@ const openSource = (source: SourceInfo) => {
 }
 
 .hero {
-  padding: 0 48rpx 60rpx;
+  padding: 0 48rpx 32rpx;
   text-align: center;
 }
 .h1 {
@@ -738,7 +735,7 @@ const openSource = (source: SourceInfo) => {
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 4rpx;
-  margin: 40rpx 48rpx 16rpx;
+  margin: 16rpx 48rpx 10rpx;
   font-weight: 700;
 }
 
@@ -748,9 +745,9 @@ const openSource = (source: SourceInfo) => {
 }
 .card {
   background-color: rgba(255, 255, 255, 0.8);
-  border-radius: 28rpx;
-  padding: 32rpx 40rpx;
-  margin-bottom: 20rpx;
+  border-radius: 20rpx;
+  padding: 24rpx 32rpx;
+  margin-bottom: 16rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -763,10 +760,10 @@ const openSource = (source: SourceInfo) => {
 }
 .card-title {
   flex: 1;
-  font-size: 30rpx;
+  font-size: 26rpx;
   font-weight: 500;
   color: #334155;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .chat-content {
@@ -783,11 +780,11 @@ const openSource = (source: SourceInfo) => {
   max-width: 85%; 
   background: linear-gradient(135deg, #1d4ed8 0%, #1a73e8 100%); 
   color: white; 
-  padding: 30rpx 40rpx; 
-  border-radius: 40rpx 40rpx 8rpx 40rpx; 
+  padding: 24rpx 36rpx; 
+  border-radius: 32rpx 32rpx 8rpx 32rpx; 
   font-size: 30rpx;
-  box-shadow: 0 8rpx 24rpx rgba(26, 115, 232, 0.2);
-  line-height: 1.5;
+  box-shadow: 0 8rpx 24rpx rgba(26, 115, 232, 0.15);
+  line-height: 1.6;
   user-select: text;
   -webkit-user-select: text;
 }
@@ -1123,6 +1120,23 @@ const openSource = (source: SourceInfo) => {
 .markdown-body {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
+.is-streaming .markdown-body p:last-child::after {
+  content: '';
+  display: inline-block;
+  width: 4rpx;
+  height: 1.2em;
+  background-color: #1a73e8;
+  margin-left: 8rpx;
+  vertical-align: middle;
+  animation: cursor-blink 0.8s infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 .searching-status {
@@ -1234,29 +1248,6 @@ const openSource = (source: SourceInfo) => {
   padding: 0rpx;
 }
 
-.feedback-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
-  margin-bottom: 30rpx;
-}
-
-.feedback-tags .tag {
-  background: #f5f7fa;
-  padding: 10rpx 20rpx;
-  border-radius: 40rpx;
-  font-size: 24rpx;
-  color: #606266;
-  border: 1rpx solid #e4e7ed;
-  transition: all 0.2s;
-}
-
-.feedback-tags .tag.selected {
-  background: #ecf5ff;
-  color: #1a73e8;
-  border-color: #1a73e8;
-}
-
 .feedback-area {
   width: 100%;
   height: 200rpx;
@@ -1304,7 +1295,7 @@ const openSource = (source: SourceInfo) => {
 }
 
 .input-bar-container {
-  padding: 24rpx 32rpx;
+  padding: 20rpx 32rpx;
   background-color: transparent;
   position: relative;
   z-index: 100;
@@ -1314,13 +1305,20 @@ const openSource = (source: SourceInfo) => {
   align-items: center;
   background-color: #fff;
   border-radius: 40rpx;
-  padding: 12rpx 12rpx 12rpx 40rpx;
+  padding: 6rpx 6rpx 6rpx 24rpx;
   box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.08);
   border: 1rpx solid rgba(0,0,0,0.01);
 }
 .flex-1 { flex: 1; }
 .px-2 { padding: 0 20rpx; }
-.text-input { font-size: 30rpx; height: 80rpx; color: #1e293b; }
+.text-input-area { 
+  min-height: 52rpx; 
+  max-height: 300rpx; 
+  font-size: 26rpx; 
+  color: #1e293b; 
+  padding: 10rpx 0;
+  line-height: 1.5;
+}
 .right-actions {
   display: flex;
   align-items: center;
@@ -1333,59 +1331,44 @@ const openSource = (source: SourceInfo) => {
   opacity: 0.6;
 }
 .send-btn { 
-  width: 80rpx; 
-  height: 80rpx; 
+  width: 64rpx; 
+  height: 64rpx; 
   border-radius: 50%; 
   display: flex; 
   align-items: center; 
-  justify-content: center; 
+  justify-content: center;
   background-color: #f1f5f9;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.btn-active { 
+.send-btn.btn-active {
   background: linear-gradient(135deg, #1d4ed8 0%, #1a73e8 100%);
   box-shadow: 0 4rpx 12rpx rgba(26, 115, 232, 0.3);
+  transform: scale(1.05);
 }
-.btn-active:active {
-  transform: scale(0.9);
+.send-btn.btn-active:active {
+  transform: scale(0.92);
 }
 .send-btn.btn-loading {
   background-color: #1a73e8;
   position: relative;
 }
-.send-btn.btn-loading::before {
-  content: '';
-  position: absolute;
-  width: 20rpx;
-  height: 20rpx;
-  background-color: #fff;
-  border-radius: 4rpx;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 2;
-}
 .send-btn.btn-loading::after {
   content: '';
   position: absolute;
-  width: 56rpx;
-  height: 56rpx;
-  top: 12rpx;
-  left: 12rpx;
+  width: 32rpx;
+  height: 32rpx;
   border: 4rpx solid rgba(255, 255, 255, 0.2);
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-  box-sizing: border-box;
 }
-.send-btn.btn-active {
-  background-color: #1a73e8;
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 .send-btn .send-icon {
   transform: rotate(-45deg);
   margin-left: 4rpx;
   margin-top: -4rpx;
 }
-.ai-tip { font-size: 22rpx; color: #aaa; text-align: center; margin-top: 16rpx; display: block; }
 </style>
