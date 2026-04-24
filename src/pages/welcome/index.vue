@@ -68,7 +68,7 @@
           <view class="ai-content-box" :class="{ 'is-streaming': isStreaming && index === messages.length - 1 }">
             <view class="ai-msg">
               <view class="rich-text">
-                <view class="markdown-body" v-html="renderMarkdown(msg.content)" @click="handleMarkdownClick"></view>
+                <view class="markdown-body" v-html="renderMarkdown(msg.content, isStreaming && index === messages.length - 1)" @click="handleMarkdownClick"></view>
                 
                 <!-- Sources Section: Refined Citations -->
                 <view v-if="getDetailedSources(msg.content).length > 0" class="sources-footer">
@@ -292,8 +292,8 @@ const CITATION_START = '\uE200';
 const CITATION_DELIMITER = '\uE202';
 const CITATION_STOP = '\uE201';
 
-const renderMarkdown = (content: string) => {
-  if (!content) return '';
+const renderMarkdown = (content: string, isStreamingNow: boolean = false) => {
+  if (!content) return isStreamingNow ? '<span class="streaming-cursor"></span>' : '';
   
   // 1. Identify where references start
   const separators = ['参考资料', '参考来源', 'Sources', 'References'];
@@ -413,7 +413,19 @@ const renderMarkdown = (content: string) => {
 
   let finalContent = resultLines.join('\n');
   
-  return md.render(finalContent);
+  let htmlResult = md.render(finalContent);
+  
+  // 4. Append streaming cursor if active
+  if (isStreamingNow) {
+    // Try to append inside the last paragraph for better visual proximity
+    if (htmlResult.trim().endsWith('</p>')) {
+      htmlResult = htmlResult.trim().replace(/<\/p>$/, '<span class="streaming-cursor"></span></p>');
+    } else {
+      htmlResult += '<span class="streaming-cursor"></span>';
+    }
+  }
+  
+  return htmlResult;
 };
 
 // Helper to extract and parse actual source names
@@ -1181,9 +1193,7 @@ const handleMarkdownClick = (e: any) => {
   position: relative;
 }
 
-.is-streaming .markdown-body > *:last-child::after,
-.is-streaming .markdown-body li:last-child::after {
-  content: '';
+.streaming-cursor {
   display: inline-block;
   width: 12rpx;
   height: 12rpx;
