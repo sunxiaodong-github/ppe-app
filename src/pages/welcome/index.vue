@@ -142,7 +142,7 @@
     </scroll-view>
 
     <!-- Input Bar -->
-    <view class="input-bar-container" :style="{ paddingBottom: keyboardHeight > 0 ? (keyboardHeight + 10) + 'px' : 'calc(40rpx + env(safe-area-inset-bottom))' }">
+    <view class="input-bar-container">
       <view class="input-bar">
         <textarea 
           v-model="inputValue"
@@ -150,11 +150,11 @@
           placeholder="有问题，尽管问我..."
           auto-height
           :maxlength="-1"
-          :cursor-spacing="20"
-          :adjust-position="false"
+          :cursor-spacing="30"
+          :adjust-position="true"
           :disabled="isStreaming"
           @confirm="handleSend"
-          @keyboardheightchange="onKeyboardHeightChange"
+          @focus="scrollToBottom(true)"
         />
         <view class="right-actions">
           <view 
@@ -232,14 +232,7 @@ const inputValue = ref('');
 const chatScrollTop = ref(0);
 const isStreaming = ref(false);
 const isMounted = ref(false);
-const keyboardHeight = ref(0);
 
-const onKeyboardHeightChange = (e: any) => {
-  keyboardHeight.value = e.detail.height;
-  if (e.detail.height > 0) {
-    scrollToBottom(true);
-  }
-};
 const messages = ref<any[]>([]);
 
 const pageTitle = computed(() => {
@@ -1295,7 +1288,7 @@ const openSource = (source: SourceInfo) => {
 }
 
 .input-bar-container {
-  padding: 20rpx 32rpx;
+  padding: 20rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
   background-color: transparent;
   position: relative;
   z-index: 100;
