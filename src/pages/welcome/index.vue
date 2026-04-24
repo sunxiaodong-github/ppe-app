@@ -50,7 +50,7 @@
       scroll-y 
       :scroll-top="chatScrollTop"
       :scroll-into-view="scrollIntoView"
-      :scroll-with-animation="true"
+      :scroll-with-animation="false"
     >
       <view v-for="(msg, index) in messages" :key="index" class="msg-item">
         <!-- User Question -->
@@ -139,8 +139,8 @@
             </view>
           </view>
         </view>
-      <view id="scroll-anchor" class="scroll-anchor" style="height: 1px;"></view>
       <view class="bottom-spacer" style="height: 40rpx;"></view>
+      <view id="scroll-anchor" class="scroll-anchor" :style="{ height: isStreaming ? '60rpx' : '1px' }"></view>
     </scroll-view>
 
     <!-- Input Bar -->
@@ -272,17 +272,19 @@ let lastScrollTime = 0;
 const scrollToBottom = (force = false) => {
   if (!isMounted.value || messages.value.length === 0) return;
   const now = Date.now();
-  if (!force && now - lastScrollTime < 100) return; 
+  if (!force && now - lastScrollTime < 30) return; 
   lastScrollTime = now;
   
-  nextTick(() => {
-    // Dual approach for best platform compatibility
-    chatScrollTop.value = 200000 + Math.random();
+  // Use a slight timeout to ensure Markdown rendering has updated the element height
+  // before we calculate the scroll position
+  setTimeout(() => {
+    chatScrollTop.value = 1000000 + Math.random();
+    
     scrollIntoView.value = '';
     nextTick(() => {
       scrollIntoView.value = 'scroll-anchor';
     });
-  });
+  }, 20);
 };
 
 // Citation Tokens from Documentation
@@ -825,6 +827,8 @@ const handleMarkdownClick = (e: any) => {
 .chat-content {
   flex: 1;
   padding: 20rpx 40rpx;
+  min-height: 0;
+  position: relative;
 }
 
 .msg-item {
