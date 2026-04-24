@@ -1,24 +1,26 @@
 <template>
   <view class="container">
     <!-- Header -->
-    <view class="header">
-      <view class="left-actions">
-        <view class="menu-icon" @click="goHistory">
-          <view class="bar w-full"></view>
-          <view class="bar w-half"></view>
-          <view class="bar w-full"></view>
+    <view class="header" :style="{ paddingTop: customBarTop }">
+      <view class="header-inner" :style="{ height: customBarHeight }">
+        <view class="left-actions">
+          <view class="menu-icon" @click="goHistory">
+            <view class="bar w-full"></view>
+            <view class="bar w-half"></view>
+            <view class="bar w-full"></view>
+          </view>
+          <!-- New Chat Button - Only visible when there's history -->
+          <AppIcon 
+            v-if="messages.length > 0" 
+            name="add_comment" 
+            size="60" 
+            color="#4b5563"
+            @click="resetChat" 
+          />
         </view>
-        <!-- New Chat Button - Only visible when there's history -->
-        <AppIcon 
-          v-if="messages.length > 0" 
-          name="add_comment" 
-          size="60" 
-          color="#4b5563"
-          @click="resetChat" 
-        />
+        <view class="top-logo">{{ pageTitle }}</view>
+        <view class="placeholder-box"></view>
       </view>
-      <view class="top-logo">{{ pageTitle }}</view>
-      <view class="placeholder-box"></view>
     </view>
 
     <!-- Empty State -->
@@ -240,6 +242,10 @@ const scrollIntoView = ref('');
 const isStreaming = ref(false);
 const isMounted = ref(false);
 const keyboardHeight = ref(0);
+
+// Status bar and capsule alignment
+const customBarTop = ref('80rpx');
+const customBarHeight = ref('44px');
 
 const onKeyboardHeightChange = (e: any) => {
   const height = e.detail.height || 0;
@@ -538,8 +544,23 @@ const submitFeedback = () => {
     closeFeedback();
   }
 };
+
 onMounted(() => {
   isMounted.value = true;
+
+  // Calculate capsule position for precise alignment
+  // #ifdef MP-WECHAT
+  try {
+    const menuButtonInfo = uni.getMenuButtonBoundingClientRect();
+    customBarTop.value = menuButtonInfo.top + 'px';
+    customBarHeight.value = (menuButtonInfo.height || 44) + 'px';
+  } catch (e) {
+    customBarTop.value = 'calc(var(--status-bar-height) + 20rpx)';
+  }
+  // #endif
+  // #ifndef MP-WECHAT
+  customBarTop.value = 'calc(var(--status-bar-height) + 20rpx)';
+  // #endif
   // Check agreement
   const hasAgreed = uni.getStorageSync('has_agreed');
   if (!hasAgreed) {
@@ -719,25 +740,29 @@ const handleMarkdownClick = (e: any) => {
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 .header {
-  padding-top: calc(var(--status-bar-height) + env(safe-area-inset-top) + 160rpx);
   padding-left: 48rpx;
   padding-right: 48rpx;
-  padding-bottom: 30rpx;
+  padding-bottom: 20rpx;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex-direction: column;
   background: transparent;
   z-index: 10;
   position: relative;
-  height: 80rpx;
+}
+.header-inner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  width: 100%;
 }
 .left-actions { 
   display: flex; 
   align-items: center; 
   gap: 32rpx;
   position: absolute;
-  left: 48rpx;
-  height: 80rpx;
+  left: 0;
+  height: 100%;
   z-index: 11;
 }
 .menu-icon {

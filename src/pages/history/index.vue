@@ -1,15 +1,17 @@
 <template>
   <view class="container">
-    <view class="header">
-      <view class="left-actions">
-        <AppIcon name="chevron_left" size="64" color="#4b5563" @click="back" />
-      </view>
-      <view class="header-title">历史会话</view>
-      <view class="right-actions">
-        <text 
-          class="reset-btn"
-          @click="resetAgreement"
-        >重置</text>
+    <view class="header" :style="{ paddingTop: customBarTop }">
+      <view class="header-inner" :style="{ height: customBarHeight }">
+        <view class="left-actions">
+          <AppIcon name="chevron_left" size="64" color="#4b5563" @click="back" />
+        </view>
+        <view class="header-title">历史会话</view>
+        <view class="right-actions">
+          <text 
+            class="reset-btn"
+            @click="resetAgreement"
+          >重置</text>
+        </view>
       </view>
     </view>
 
@@ -50,8 +52,26 @@ import { ref, onMounted } from 'vue';
 
 const items = ref<any[]>([]);
 
+// Status bar and capsule alignment
+const customBarTop = ref('80rpx');
+const customBarHeight = ref('44px');
+
 onMounted(() => {
   loadHistory();
+  
+  // Calculate capsule position for precise alignment
+  // #ifdef MP-WECHAT
+  try {
+    const menuButtonInfo = uni.getMenuButtonBoundingClientRect();
+    customBarTop.value = menuButtonInfo.top + 'px';
+    customBarHeight.value = (menuButtonInfo.height || 44) + 'px';
+  } catch (e) {
+    customBarTop.value = 'calc(var(--status-bar-height) + 20rpx)';
+  }
+  // #endif
+  // #ifndef MP-WECHAT
+  customBarTop.value = 'calc(var(--status-bar-height) + 20rpx)';
+  // #endif
 });
 
 const loadHistory = () => {
@@ -125,22 +145,26 @@ const confirmDelete = (index: number) => {
 .container { display: flex; flex-direction: column; height: 100vh; background-color: #f8f9fa; }
 .header { 
   display: flex; 
-  align-items: center; 
-  justify-content: center; 
-  padding-top: calc(var(--status-bar-height) + env(safe-area-inset-top) + 160rpx);
+  flex-direction: column;
   padding-left: 48rpx;
   padding-right: 48rpx;
-  padding-bottom: 30rpx;
+  padding-bottom: 20rpx;
   background-color: transparent;
   position: relative;
-  height: 80rpx;
+}
+.header-inner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  width: 100%;
 }
 .left-actions { 
   display: flex; 
   align-items: center; 
   position: absolute;
-  left: 48rpx;
-  height: 80rpx;
+  left: 0;
+  height: 100%;
 }
 .header-title { 
   font-size: 34rpx; 
@@ -152,15 +176,15 @@ const confirmDelete = (index: number) => {
 }
 .right-actions {
   position: absolute;
-  right: 48rpx;
+  right: 0;
   display: flex;
   align-items: center;
-  height: 80rpx;
+  height: 100%;
 }
 .reset-btn { font-size: 24rpx; color: #94a3b8; text-decoration: none; border: 1rpx solid #e2e8f0; padding: 4rpx 16rpx; border-radius: 20rpx; }
 .clear-all { font-size: 24rpx; color: #999; }
 
-.list { flex: 1; padding: 80rpx 30rpx 24rpx; }
+.list { flex: 1; padding: 40rpx 30rpx 24rpx; }
 .item {
   background: #fff;
   border-radius: 32rpx;
