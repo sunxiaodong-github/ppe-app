@@ -549,18 +549,26 @@ onMounted(() => {
   isMounted.value = true;
 
   // Calculate capsule position for precise alignment
+  const sysInfo = uni.getSystemInfoSync();
+  const statusBarHeight = sysInfo.statusBarHeight || 20;
+  
+  let top = statusBarHeight + 7;
+  let height = 32;
+
   // #ifdef MP-WECHAT
   try {
     const menuButtonInfo = uni.getMenuButtonBoundingClientRect();
-    customBarTop.value = menuButtonInfo.top + 'px';
-    customBarHeight.value = (menuButtonInfo.height || 44) + 'px';
+    if (menuButtonInfo && menuButtonInfo.top) {
+      top = menuButtonInfo.top;
+      height = menuButtonInfo.height;
+    }
   } catch (e) {
-    customBarTop.value = 'calc(var(--status-bar-height) + 20rpx)';
+    // Keep defaults
   }
   // #endif
-  // #ifndef MP-WECHAT
-  customBarTop.value = 'calc(var(--status-bar-height) + 20rpx)';
-  // #endif
+  
+  customBarTop.value = top + 'px';
+  customBarHeight.value = height + 'px';
   // Check agreement
   const hasAgreed = uni.getStorageSync('has_agreed');
   if (!hasAgreed) {
