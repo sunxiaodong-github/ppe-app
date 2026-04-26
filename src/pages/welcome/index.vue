@@ -421,6 +421,15 @@ const renderMarkdown = (content: string, isStreamingNow: boolean = false) => {
   
   let htmlResult = md.render(finalContent);
   
+  // #ifdef MP-WEIXIN
+  // 仅在微信小程序环境下，注入内联样式以确保 rich-text 渲染正确
+  // 使用精确匹配防止影响其他潜在标签，且只针对 table 核心标签
+  htmlResult = htmlResult
+    .replace(/<table\b/gi, '<table style="width:100%;border-collapse:collapse;margin:12rpx 0;border:1px solid #d1d5db;display:table;"')
+    .replace(/<th\b/gi, '<th style="border:1px solid #d1d5db;padding:8rpx 12rpx;background-color:#f3f4f6;font-weight:bold;text-align:left;"')
+    .replace(/<td\b/gi, '<td style="border:1px solid #d1d5db;padding:8rpx 12rpx;text-align:left;"');
+  // #endif
+  
   // 4. Append streaming cursor if active
   if (isStreamingNow) {
     // Try to append inside the last paragraph for better visual proximity
