@@ -69,12 +69,26 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue';
+import { login, initInterceptors } from '@/services/apiService';
 
-const agree = () => {
-  uni.setStorageSync('has_agreed', 'true');
-  uni.reLaunch({
-    url: '/pages/welcome/index'
-  });
+const agree = async () => {
+  // 初始化请求拦截器
+  initInterceptors();
+
+  // 调用微信登录，获取 token
+  const result = await login();
+
+  if (result.success) {
+    uni.setStorageSync('has_agreed', 'true');
+    uni.reLaunch({
+      url: '/pages/welcome/index'
+    });
+  } else {
+    uni.showToast({
+      title: result.error || '登录失败',
+      icon: 'none'
+    });
+  }
 };
 
 const goPolicy = () => {
