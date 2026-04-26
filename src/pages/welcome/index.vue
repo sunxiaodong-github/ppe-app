@@ -919,33 +919,33 @@ const handleMarkdownClick = (e: any) => {
 }
 
 /* Markdown Body Enhancements for all platforms */
-.markdown-body {
+:deep(.markdown-body) {
   font-size: 28rpx;
   line-height: 1.6;
   color: #333;
   word-break: break-all;
 }
 
-.markdown-body p {
+:deep(.markdown-body p) {
   margin-bottom: 20rpx;
   display: block;
 }
 
-.markdown-body p:last-child {
+:deep(.markdown-body p:last-child) {
   margin-bottom: 0;
 }
 
-.markdown-body ul, 
-.markdown-body ol {
+:deep(.markdown-body ul), 
+:deep(.markdown-body ol) {
   margin-bottom: 20rpx;
   padding-left: 40rpx;
 }
 
-.markdown-body li {
+:deep(.markdown-body li) {
   margin-bottom: 8rpx;
 }
 
-.markdown-body blockquote {
+:deep(.markdown-body blockquote) {
   margin: 16rpx 0;
   padding: 16rpx 32rpx;
   background-color: #f8fafc;
@@ -956,7 +956,7 @@ const handleMarkdownClick = (e: any) => {
 }
 
 /* Link styling */
-.markdown-body a {
+:deep(.markdown-body a) {
   color: #1a73e8;
   text-decoration: none;
   border-bottom: 2rpx solid #1a73e8;
@@ -964,12 +964,12 @@ const handleMarkdownClick = (e: any) => {
   font-weight: 500;
 }
 
-.markdown-footer-refs {
+:deep(.markdown-footer-refs) {
   display: none !important;
 }
 
 /* TABLE STYLES - Enhanced for all platforms */
-.markdown-body table {
+:deep(.markdown-body table) {
   width: 100% !important;
   border-collapse: collapse !important;
   margin: 24rpx 0 !important;
@@ -979,35 +979,42 @@ const handleMarkdownClick = (e: any) => {
   display: table !important;
 }
 
-.markdown-body thead {
+:deep(.markdown-body thead) {
   background-color: #f3f4f6 !important;
+  display: table-header-group !important;
 }
 
-.markdown-body tr {
+:deep(.markdown-body tbody) {
+  display: table-row-group !important;
+}
+
+:deep(.markdown-body tr) {
+  display: table-row !important;
   border-bottom: 1rpx solid #d1d5db !important;
 }
 
-.markdown-body th,
-.markdown-body td {
+:deep(.markdown-body th),
+:deep(.markdown-body td) {
   border: 1rpx solid #d1d5db !important;
   padding: 12rpx 16rpx !important;
   text-align: left !important;
   line-height: 1.4 !important;
+  display: table-cell !important;
 }
 
-.markdown-body th {
+:deep(.markdown-body th) {
   font-weight: bold !important;
   color: #1f2937 !important;
   white-space: nowrap !important;
 }
 
-.markdown-body tr:nth-child(even) {
+:deep(.markdown-body tr:nth-child(even)) {
   background-color: #f9fafb !important;
 }
 
 /* Citation Tags Styling - Minimalist Grey Style */
-.citation-tag,
-.citation-link {
+:deep(.citation-tag),
+:deep(.citation-link) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1025,12 +1032,12 @@ const handleMarkdownClick = (e: any) => {
   line-height: 1;
 }
 
-.citation-link {
+:deep(.citation-link) {
   cursor: pointer;
   background-color: #f8fafc;
 }
 
-.citation-link:active {
+:deep(.citation-link:active) {
   background-color: #e2e8f0;
   transform: scale(0.9);
 }
