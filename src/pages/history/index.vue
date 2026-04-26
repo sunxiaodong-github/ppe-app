@@ -3,7 +3,7 @@
     <view class="header" :style="{ paddingTop: customBarTop }">
       <view class="header-inner" :style="{ height: customBarHeight }">
         <view class="left-actions">
-          <AppIcon name="chevron_left" size="64" color="#4b5563" @click="back" />
+          <AppIcon name="chevron_left" size="56" color="#4b5563" @click="back" />
         </view>
         <view class="header-title">历史会话</view>
         <view class="right-actions">
@@ -154,8 +154,8 @@ const confirmDelete = (index: number) => {
 .header { 
   display: flex; 
   flex-direction: column;
-  padding-left: 48rpx;
-  padding-right: 48rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
   padding-bottom: 20rpx;
   background-color: transparent;
   position: relative;

@@ -13,7 +13,7 @@
           <AppIcon 
             v-if="messages.length > 0" 
             name="add_comment" 
-            size="60" 
+            size="54" 
             color="#4b5563"
             @click="resetChat" 
           />
@@ -748,8 +748,8 @@ const handleMarkdownClick = (e: any) => {
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 .header {
-  padding-left: 48rpx;
-  padding-right: 48rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
   padding-bottom: 20rpx;
   display: flex;
   flex-direction: column;
@@ -777,8 +777,8 @@ const handleMarkdownClick = (e: any) => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  width: 60rpx;
-  height: 40rpx;
+  width: 54rpx;
+  height: 36rpx;
   opacity: 0.7;
   transition: opacity 0.2s;
   flex-shrink: 0;
@@ -926,26 +926,26 @@ const handleMarkdownClick = (e: any) => {
   word-break: break-all;
 }
 
-:deep(.markdown-body p) {
+.markdown-body p {
   margin-bottom: 20rpx;
   display: block;
 }
 
-:deep(.markdown-body p:last-child) {
+.markdown-body p:last-child {
   margin-bottom: 0;
 }
 
-:deep(.markdown-body ul), 
-:deep(.markdown-body ol) {
+.markdown-body ul, 
+.markdown-body ol {
   margin-bottom: 20rpx;
   padding-left: 40rpx;
 }
 
-:deep(.markdown-body li) {
+.markdown-body li {
   margin-bottom: 8rpx;
 }
 
-:deep(.markdown-body blockquote) {
+.markdown-body blockquote {
   margin: 16rpx 0;
   padding: 16rpx 32rpx;
   background-color: #f8fafc;
@@ -956,7 +956,7 @@ const handleMarkdownClick = (e: any) => {
 }
 
 /* Link styling */
-:deep(.markdown-body a) {
+.markdown-body a {
   color: #1a73e8;
   text-decoration: none;
   border-bottom: 2rpx solid #1a73e8;
@@ -964,62 +964,42 @@ const handleMarkdownClick = (e: any) => {
   font-weight: 500;
 }
 
-:deep(.markdown-footer-refs) {
+.markdown-footer-refs {
   display: none !important;
 }
 
-/* TABLE STYLES - Consolidated and Improved */
-:deep(.markdown-body table) {
+/* TABLE STYLES - Enhanced for Mini Program */
+.markdown-body table {
   width: 100%;
-  display: block;
-  overflow-x: auto;
   border-collapse: collapse;
   margin: 24rpx 0;
   font-size: 24rpx;
-  background-color: #fff;
-  border: 1rpx solid #e2e8f0;
-  border-radius: 8rpx;
-  -webkit-overflow-scrolling: touch;
+  background-color: #ffffff;
+  border: 1rpx solid #d1d5db !important;
+  display: table !important; /* Ensure it stays a table */
 }
 
-:deep(.markdown-body thead) {
-  display: table-header-group;
-  width: 100%;
+.markdown-body thead {
+  background-color: #f3f4f6;
 }
 
-:deep(.markdown-body tbody) {
-  display: table-row-group;
-  width: 100%;
-}
-
-:deep(.markdown-body tr) {
-  display: table-row;
-  width: 100%;
-}
-
-:deep(.markdown-body th),
-:deep(.markdown-body td) {
-  display: table-cell;
-  border: 1rpx solid #e2e8f0;
-  padding: 16rpx 20rpx;
+.markdown-body th,
+.markdown-body td {
+  border: 1rpx solid #d1d5db !important;
+  padding: 12rpx 16rpx;
   text-align: left;
   line-height: 1.4;
-  min-width: 120rpx;
+  word-break: normal; /* Prevents cell breaking too aggressively */
 }
 
-:deep(.markdown-body th) {
-  background-color: #f8fafc;
-  font-weight: 600;
-  color: #475569;
+.markdown-body th {
+  font-weight: bold;
+  color: #1f2937;
   white-space: nowrap;
 }
 
-:deep(.markdown-body tr:nth-child(even)) {
+.markdown-body tr:nth-child(even) {
   background-color: #f9fafb;
-}
-
-:deep(.markdown-body tr:hover) {
-  background-color: #f1f5f9;
 }
 
 
