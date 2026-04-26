@@ -918,7 +918,7 @@ const handleMarkdownClick = (e: any) => {
   -webkit-user-select: text;
 }
 
-/* Markdown Body Enhancements */
+/* Markdown Body Enhancements for all platforms */
 .markdown-body {
   font-size: 28rpx;
   line-height: 1.6;
@@ -968,45 +968,46 @@ const handleMarkdownClick = (e: any) => {
   display: none !important;
 }
 
-/* TABLE STYLES - Enhanced for Mini Program */
+/* TABLE STYLES - Enhanced for all platforms */
 .markdown-body table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 24rpx 0;
-  font-size: 24rpx;
-  background-color: #ffffff;
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 24rpx 0 !important;
+  font-size: 24rpx !important;
+  background-color: #ffffff !important;
   border: 1rpx solid #d1d5db !important;
-  display: table !important; /* Ensure it stays a table */
+  display: table !important;
 }
 
 .markdown-body thead {
-  background-color: #f3f4f6;
+  background-color: #f3f4f6 !important;
+}
+
+.markdown-body tr {
+  border-bottom: 1rpx solid #d1d5db !important;
 }
 
 .markdown-body th,
 .markdown-body td {
   border: 1rpx solid #d1d5db !important;
-  padding: 12rpx 16rpx;
-  text-align: left;
-  line-height: 1.4;
-  word-break: normal; /* Prevents cell breaking too aggressively */
+  padding: 12rpx 16rpx !important;
+  text-align: left !important;
+  line-height: 1.4 !important;
 }
 
 .markdown-body th {
-  font-weight: bold;
-  color: #1f2937;
-  white-space: nowrap;
+  font-weight: bold !important;
+  color: #1f2937 !important;
+  white-space: nowrap !important;
 }
 
 .markdown-body tr:nth-child(even) {
-  background-color: #f9fafb;
+  background-color: #f9fafb !important;
 }
 
-
-
 /* Citation Tags Styling - Minimalist Grey Style */
-:deep(.citation-tag),
-:deep(.citation-link) {
+.citation-tag,
+.citation-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1024,12 +1025,12 @@ const handleMarkdownClick = (e: any) => {
   line-height: 1;
 }
 
-:deep(.citation-link) {
+.citation-link {
   cursor: pointer;
   background-color: #f8fafc;
 }
 
-:deep(.citation-link:active) {
+.citation-link:active {
   background-color: #e2e8f0;
   transform: scale(0.9);
 }
@@ -1042,22 +1043,22 @@ const handleMarkdownClick = (e: any) => {
 }
 
 .sources-header {
-  display: flex;
-  align-items: center;
-  padding: 8rpx 0;
-  cursor: pointer;
+  display: flex !important;
+  align-items: center !important;
+  padding: 8rpx 0 !important;
+  cursor: pointer !important;
 }
 
 .sources-header-left {
-  display: flex;
-  align-items: center;
-  gap: 4rpx;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4rpx !important;
 }
 
 .sources-title {
-  font-size: 26rpx;
-  color: #1a73e8;
-  font-weight: 600;
+  font-size: 26rpx !important;
+  color: #1a73e8 !important;
+  font-weight: 600 !important;
 }
 
 .sources-count-badge {
@@ -1070,11 +1071,6 @@ const handleMarkdownClick = (e: any) => {
   border: 1rpx solid rgba(26, 115, 232, 0.1);
 }
 
-.sources-header:active {
-  background-color: #f0f7ff;
-  border-radius: 12rpx;
-}
-
 .sources-content-list {
   padding: 12rpx 0 8rpx 40rpx;
   display: flex;
@@ -1083,15 +1079,10 @@ const handleMarkdownClick = (e: any) => {
 }
 
 .source-link-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12rpx;
-  padding: 12rpx 0;
-  border-bottom: 1rpx solid #f8fafc;
-}
-
-.source-link-item:last-child {
-  border-bottom: none;
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 12rpx !important;
+  padding: 12rpx 0 !important;
 }
 
 .source-no {
@@ -1118,56 +1109,6 @@ const handleMarkdownClick = (e: any) => {
   text-decoration: underline !important;
 }
 
-.source-link-item:active {
-  opacity: 0.7;
-}
-
-.source-pill {
-  display: flex;
-  align-items: center;
-  background-color: #fff;
-  padding: 8rpx 16rpx 8rpx 10rpx;
-  border-radius: 12rpx;
-  border: 1.5rpx solid #e2e8f0;
-  max-width: 100%;
-  transition: all 0.2s ease;
-  box-shadow: 0 2rpx 4rpx rgba(0,0,0,0.02);
-  gap: 8rpx;
-}
-
-.source-pill.has-link {
-  border-color: rgba(26,115,232,0.2);
-  background-color: #f8fbff;
-}
-
-.source-pill.has-link .pill-name {
-  color: #1a73e8;
-}
-
-.source-pill:active {
-  background-color: #f8fafc;
-  transform: scale(0.98);
-}
-
-.pill-id {
-  font-size: 14rpx;
-  color: #94a3b8;
-  font-weight: bold;
-  padding: 2rpx 6rpx;
-  background: #f1f5f9;
-  border-radius: 4rpx;
-  line-height: 1;
-}
-
-.pill-name {
-  font-size: 24rpx;
-  color: #334155;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: 500;
-}
-
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
 }
@@ -1175,28 +1116,6 @@ const handleMarkdownClick = (e: any) => {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-10rpx); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-:deep(blockquote) {
-  border-left: 8rpx solid #e5e7eb;
-  padding-left: 24rpx;
-  color: #666;
-  font-style: italic;
-  margin: 16rpx 0;
-  background-color: #f9fafb;
-  padding: 12rpx 24rpx;
-  border-radius: 4rpx;
-}
-.rich-text .p { font-size: 28rpx; line-height: 1.6; color: #333; word-break: break-all; margin-bottom: 16rpx; }
-
-/* List Styles */
-:deep(.markdown-body ul), :deep(.markdown-body ol) {
-  padding-left: 40rpx;
-  margin: 16rpx 0;
-}
-:deep(.markdown-body li) {
-  margin-bottom: 8rpx;
-  color: #333;
 }
 
 /* Mobile-safe table container */
