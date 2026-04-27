@@ -3,44 +3,39 @@
     <!-- Welcome Page Mockup (Non-interactive) -->
     <view class="welcome-mock">
       <view class="header">
-        <view class="menu-icon">
-          <view class="bar w-full"></view>
-          <view class="bar w-half"></view>
-          <view class="bar w-full"></view>
+        <view class="header-inner">
+          <view class="menu-icon">
+            <view class="bar w-full"></view>
+            <view class="bar w-half"></view>
+            <view class="bar w-full"></view>
+          </view>
+          <view class="top-logo">智护AI</view>
         </view>
       </view>
 
       <view class="hero">
         <view class="h1">Hi, 我是智护AI~</view>
         <view class="p">随时为您解答安全生产标准与规范</view>
-        
-        <view class="categories">
-          <view class="cat-chip">安全帽</view>
-          <view class="cat-chip">口罩/呼吸</view>
-          <view class="cat-chip">安全带/挂钩</view>
-        </view>
       </view>
 
       <view class="section-title">你可以这样问我</view>
       <view class="suggestions">
         <view class="card">
           <text class="card-title">安全帽使用年限标准是多少？</text>
-          <text class="icon arrow">chevron_right</text>
+          <AppIcon name="chevron_right" size="32" color="#d1d5db" />
         </view>
         <view class="card">
           <text class="card-title">KN95口罩的国家标准号是什么？</text>
-          <text class="icon arrow">chevron_right</text>
+          <AppIcon name="chevron_right" size="32" color="#d1d5db" />
         </view>
       </view>
 
       <view class="input-bar-mock">
         <view class="input-bar">
-          <AppIcon name="mic" size="36" color="#9ca3af" />
           <text class="placeholder">有问题，尽管问我...</text>
           <view class="right-actions">
-            <AppIcon name="add_circle" size="36" color="#9ca3af" />
             <view class="send-btn">
-              <AppIcon name="send" size="36" color="#fff" fill />
+              <AppIcon name="send" size="48" color="#d1d5db" fill />
             </view>
           </view>
         </view>
@@ -117,7 +112,7 @@ const reject = () => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: linear-gradient(180deg, #f0f4f9 0%, #f6f6f6 100%);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   position: relative;
   overflow: hidden;
 }
@@ -126,131 +121,120 @@ const reject = () => {
 .welcome-mock {
   opacity: 0.6; /* Slightly fade the background content */
   filter: blur(2px); /* Blur for better focus on modal */
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .header {
-  padding-top: calc(60rpx + env(safe-area-inset-top));
-  padding-left: 40rpx;
-  padding-right: 40rpx;
-  padding-bottom: 30rpx;
+  padding: 80rpx 32rpx 20rpx;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+}
+.header-inner {
+  display: flex;
+  justify-content: center;
   align-items: center;
+  position: relative;
+  width: 100%;
+  height: 44px;
 }
 .menu-icon {
   display: flex;
   flex-direction: column;
-  gap: 10rpx;
-  width: 44rpx;
-  padding: 20rpx 0;
+  justify-content: space-between;
+  width: 54rpx;
+  height: 36rpx;
+  position: absolute;
+  left: 0;
 }
 .bar {
-  height: 3rpx;
-  background-color: #4b5563;
-  border-radius: 4rpx;
+  height: 7rpx;
+  background-color: #334155;
+  border-radius: 7rpx;
 }
 .w-full { width: 100%; }
 .w-half { width: 60%; }
-.icon {
-  font-family: 'Material Symbols Outlined';
-  font-size: 36rpx;
-  color: #6b7280;
+.top-logo { 
+  font-size: 34rpx; 
+  font-weight: 700; 
+  color: #0f172a; 
 }
-.fill { font-variation-settings: 'FILL' 1; }
 
 .hero {
-  padding: 60rpx 40rpx 40rpx;
+  padding: 60rpx 48rpx 32rpx;
   text-align: center;
+  margin-top: 120rpx;
 }
 .h1 {
-  font-size: 52rpx;
+  font-size: 56rpx;
   font-weight: 800;
-  color: #1a1a1a;
-  margin-bottom: 16rpx;
-  letter-spacing: -1rpx;
+  color: #0f172a;
+  margin-bottom: 20rpx;
+  letter-spacing: -2rpx;
+  line-height: 1.1;
 }
-.p {
-  color: #666;
-  font-size: 28rpx;
+.hero .p {
+  color: #64748b;
+  font-size: 30rpx;
   margin-bottom: 40rpx;
-  opacity: 0.8;
-}
-.categories {
-  display: flex;
-  justify-content: center;
-  gap: 20rpx;
-  flex-wrap: wrap;
-}
-.cat-chip {
-  background-color: #fff;
-  border: 1rpx solid #e5e7eb;
-  padding: 12rpx 32rpx;
-  border-radius: 100rpx;
-  font-size: 24rpx;
-  color: #4b5563;
 }
 
 .section-title {
-  font-size: 24rpx;
-  color: #999;
+  font-size: 22rpx;
+  color: #94a3b8;
   text-transform: uppercase;
-  letter-spacing: 2rpx;
-  margin: 20rpx 40rpx 10rpx;
-  font-weight: 600;
+  letter-spacing: 4rpx;
+  margin: 16rpx 48rpx 10rpx;
+  font-weight: 700;
 }
 
 .suggestions {
-  padding: 0 40rpx;
+  padding: 0 48rpx;
 }
 .card {
-  background-color: #fff;
-  border-radius: 28rpx;
-  padding: 32rpx 40rpx;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 20rpx;
+  padding: 24rpx 32rpx;
   margin-bottom: 16rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border: 1rpx solid rgba(0,0,0,0.02);
+  border: 1rpx solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.04);
 }
 .card-title {
   flex: 1;
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 500;
-  color: #374151;
-}
-.arrow {
-  font-size: 32rpx;
-  color: #d1d5db;
+  color: #334155;
 }
 
 .input-bar-mock {
-  padding: 40rpx 40rpx;
+  padding: 20rpx 32rpx env(safe-area-inset-bottom);
+  margin-top: auto;
 }
 .input-bar {
   background-color: #fff;
-  height: 108rpx;
-  border-radius: 32rpx;
+  height: 100rpx;
+  border-radius: 48rpx;
   display: flex;
   align-items: center;
-  padding: 0 24rpx;
-  border: 1rpx solid #e5e7eb;
+  padding: 0 32rpx;
+  border: 1rpx solid rgba(0,0,0,0.01);
+  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.08);
 }
-.text-gray { color: #9ca3af; }
 .placeholder {
   flex: 1;
-  color: #9ca3af;
-  font-size: 28rpx;
-  margin-left: 20rpx;
-}
-.right-actions {
-  display: flex;
-  align-items: center;
+  color: #94a3b8;
+  font-size: 30rpx;
+  margin-left: 16rpx;
 }
 .send-btn {
-  background-color: #f3f4f6;
+  background-color: #f1f5f9;
   width: 72rpx;
   height: 72rpx;
-  border-radius: 20rpx;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
