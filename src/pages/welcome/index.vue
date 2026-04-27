@@ -230,7 +230,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 
 // aiService.ts needs to be correctly imported
-import { chatStream, type ChatMessage } from '@/services/aiService';
+import { chatStream } from '@/services/chatService';
 import MarkdownIt from 'markdown-it';
 
 const md = new MarkdownIt({
@@ -267,6 +267,7 @@ const onInputFocus = () => {
 };
 
 const messages = ref<any[]>([]);
+const currentSessionId = ref<string | null>(null);
 
 const pageTitle = computed(() => {
   if (messages.value.length === 0) return '智护AI';
@@ -277,7 +278,7 @@ const pageTitle = computed(() => {
   return content.substring(0, 10) + '...';
 });
 
-// Use a throttled version for scrolling
+// Helper to extract and parse actual source names
 let lastScrollTime = 0;
 const scrollToBottom = (force = false) => {
   if (!isMounted.value || messages.value.length === 0) return;
@@ -629,6 +630,7 @@ const goHistory = () => {
 const resetChat = () => {
   if (isStreaming.value) return;
   messages.value = [];
+  currentSessionId.value = null;
   inputValue.value = '';
 };
 
@@ -651,40 +653,49 @@ const startChat = async (userText: string) => {
 
   // 1. Add user message
   messages.value.push({ role: 'user', content: userText });
-  
+
   // 2. Prepare AI message placeholder
   const aiMsgIndex = messages.value.length;
-  messages.value.push({ role: 'assistant', content: '', interaction: 'none' });
-  
+  messages.value.push({ role: 'assistant', content: '', interaction: 'none', messageId: undefined });
+
   isStreaming.value = true;
   scrollToBottom(true);
 
   // 3. Prepare full conversation for API (keeping it simple for now)
-  const apiMessages: ChatMessage[] = messages.value.slice(0, aiMsgIndex).map(m => ({
-    role: m.role as any,
+  const apiMessages = messages.value.slice(0, aiMsgIndex).map((m: any) => ({
+    role: m.role,
     content: m.content
   }));
 
-  // 4. Call Aliyun Bailian API
+  // 4. Call backend Chat API
   chatStream(
-    apiMessages,
-    (delta) => {
-      if (messages.value[aiMsgIndex]) {
-        messages.value[aiMsgIndex].content += delta;
-        scrollToBottom();
+    { content: userText, sessionId: currentSessionId.value || null },
+    {
+      onChunk: (delta) => {
+        if (messages.value[aiMsgIndex]) {
+          messages.value[aiMsgIndex].content += delta;
+          scrollToBottom();
+        }
+      },
+      onMeta: (meta) => {
+        // Save sessionId and messageId for future use
+        currentSessionId.value = meta.sessionId;
+        messages.value[aiMsgIndex].messageId = meta.assistantMessageId;
+      },
+      onComplete: (result) => {
+        isStreaming.value = false;
+        currentSessionId.value = result.sessionId;
+        messages.value[aiMsgIndex].messageId = result.assistantMessageId;
+        saveToHistory();
+        scrollToBottom(true);
+      },
+      onError: (error) => {
+        isStreaming.value = false;
+        if (messages.value[aiMsgIndex] && !messages.value[aiMsgIndex].content) {
+          messages.value[aiMsgIndex].content = error.message || '抱歉，服务出现了一点问题，请稍后再试。';
+        }
+        uni.showToast({ title: '连接失败', icon: 'none' });
       }
-    },
-    (fullText) => {
-      isStreaming.value = false;
-      saveToHistory();
-      scrollToBottom(true);
-    },
-    (error) => {
-      isStreaming.value = false;
-      if (messages.value[aiMsgIndex] && !messages.value[aiMsgIndex].content) {
-        messages.value[aiMsgIndex].content = '抱歉，服务出现了一点问题，请稍后再试。';
-      }
-      uni.showToast({ title: '连接失败', icon: 'none' });
     }
   );
 };
