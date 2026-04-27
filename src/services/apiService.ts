@@ -193,10 +193,17 @@ export interface RequestOptions {
 
 export function request<T = any>(options: RequestOptions): Promise<T> {
   return new Promise((resolve, reject) => {
+    // Add Authorization header if token exists
+    const token = getToken();
+    const headers: Record<string, string> = options.header || {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     uni.request({
       url: options.url,
       method: options.method || 'GET',
-      header: options.header,
+      header: headers,
       data: options.data,
       success: (res) => {
         const data = res.data as any;

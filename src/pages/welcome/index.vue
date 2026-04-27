@@ -216,7 +216,7 @@
             class="submit-btn" 
             :class="{ active: feedbackText.trim() }"
             :disabled="!feedbackText.trim()"
-            @click="submitFeedback"
+            @click="handleSubmitFeedback"
           >
             提交反馈
           </button>
@@ -231,6 +231,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 
 // aiService.ts needs to be correctly imported
 import { chatStream } from '@/services/chatService';
+import { submitFeedback } from '@/services/feedbackService';
 import MarkdownIt from 'markdown-it';
 
 const md = new MarkdownIt({
@@ -556,10 +557,23 @@ const closeFeedback = () => {
   feedbackText.value = '';
 };
 
-const submitFeedback = () => {
+const handleSubmitFeedback = async () => {
   if (feedbackText.value.trim()) {
     if (currentFeedbackIndex.value !== null && messages.value[currentFeedbackIndex.value]) {
-       messages.value[currentFeedbackIndex.value].interaction = 'feedbacked';
+      const msg = messages.value[currentFeedbackIndex.value];
+      try {
+        await submitFeedback({
+          messageId: msg.messageId as number,
+          feedbackType: 'suggestion',
+          reasonText: feedbackText.value.trim()
+        });
+        msg.interaction = 'feedbacked';
+      } catch (err: any) {
+        uni.showToast({
+          title: err?.message || '提交失败',
+          icon: 'none'
+        });
+      }
     }
     closeFeedback();
   }
@@ -714,10 +728,31 @@ const saveToHistory = () => {
   uni.setStorageSync('chat_history', history.slice(0, 20)); // Limit to 20
 };
 
-const toggleLike = (index: number) => {
+const toggleLike = async (index: number) => {
   if (!messages.value[index]) return;
-  const currentStatus = messages.value[index].interaction;
-  messages.value[index].interaction = currentStatus === 'liked' ? 'none' : 'liked';
+  const msg = messages.value[index];
+  const currentStatus = msg.interaction;
+
+  // If already liked, toggle off locally (no API call for unlike)
+  if (currentStatus === 'liked') {
+    msg.interaction = 'none';
+    return;
+  }
+
+  // Call API to submit like
+  try {
+    await submitFeedback({
+      messageId: msg.messageId as number,
+      feedbackType: 'liked'
+    });
+    msg.interaction = 'liked';
+  } catch (err: any) {
+    if (err?.code === 2003) {
+      uni.showToast({ title: '已反馈，请取消后再点赞', icon: 'none' });
+    } else {
+      uni.showToast({ title: err?.message || '操作失败', icon: 'none' });
+    }
+  }
 };
 
 const toggleSources = (index: number) => {
