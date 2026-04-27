@@ -28,6 +28,10 @@
           <text class="card-title">KN95口罩的国家标准号是什么？</text>
           <AppIcon name="chevron_right" size="32" color="#d1d5db" />
         </view>
+        <view class="card">
+          <text class="card-title">如何选择高处作业用的安全带？</text>
+          <AppIcon name="chevron_right" size="32" color="#d1d5db" />
+        </view>
       </view>
 
       <view class="input-bar-mock">
@@ -35,7 +39,7 @@
           <text class="placeholder">有问题，尽管问我...</text>
           <view class="right-actions">
             <view class="send-btn">
-              <AppIcon name="send" size="48" color="#d1d5db" fill />
+              <AppIcon class="send-icon" name="send" size="48" color="#d1d5db" fill />
             </view>
           </view>
         </view>
@@ -238,6 +242,11 @@ const reject = () => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.send-btn .send-icon {
+  transform: rotate(-45deg);
+  margin-left: 4rpx;
+  margin-top: -4rpx;
 }
 .white { color: #fff; }
 
