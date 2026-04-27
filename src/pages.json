@@ -21,7 +21,9 @@
     {
       "path": "pages/history/index",
       "style": {
-        "navigationStyle": "custom"
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true,
+        "backgroundTextStyle": "dark"
       }
     }
   ],

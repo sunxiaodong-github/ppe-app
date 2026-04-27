@@ -53,7 +53,7 @@ CREATE TABLE users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
 -- 2) 会话表
-CREATE TABLE conversations (
+CREATE TABLE sessions (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '会话主键ID',
   session_id VARCHAR(64) NOT NULL COMMENT '业务会话ID',
   user_id BIGINT NOT NULL COMMENT '用户ID',
@@ -61,22 +61,21 @@ CREATE TABLE conversations (
   is_deleted TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除：0否 1是',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间（UTC）',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间（UTC）',
-  UNIQUE KEY uk_conversations_session_id (session_id),
-  KEY idx_conversations_user_updated (user_id, updated_at),
-  CONSTRAINT fk_conversations_user FOREIGN KEY (user_id) REFERENCES users(id)
+  UNIQUE KEY uk_sessions_session_id (session_id),
+  KEY idx_sessions_user_updated (user_id, updated_at),
+  CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会话表';
 
 -- 3) 消息表
 CREATE TABLE messages (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '消息主键ID',
-  session_id VARCHAR(64) NOT NULL COMMENT '会话ID（关联 conversations.session_id）',
+  session_id VARCHAR(64) NOT NULL COMMENT '会话ID（关联 sessions.session_id）',
   role ENUM('user','assistant') NOT NULL COMMENT '角色：user/assistant',
-  content_md MEDIUMTEXT NOT NULL COMMENT '消息内容（Markdown）',
-  status ENUM('streaming','success','failed') NOT NULL DEFAULT 'success' COMMENT '状态：streaming/success/failed',
+  content MEDIUMTEXT NOT NULL COMMENT '消息内容（Markdown）',
   error_code VARCHAR(32) NULL COMMENT '失败时错误码',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间（UTC）',
   KEY idx_messages_conv_created (session_id, created_at),
-  CONSTRAINT fk_messages_conversation FOREIGN KEY (session_id) REFERENCES conversations(session_id)
+  CONSTRAINT fk_messages_session FOREIGN KEY (session_id) REFERENCES sessions(session_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='消息表';
 
 -- 4) 回答反馈表
@@ -231,7 +230,7 @@ CREATE TABLE feedbacks (
 |-------|------|-----------|
 | meta | 首包，建立会话与消息 ID | `sessionId`, `userMessageId`, `assistantMessageId` |
 | chunk | 增量文本 | `delta`（字符串片段） |
-| done | 正常结束 | `assistantMessageId`, `status: "success"`, `createdAt` |
+| done | 正常结束 | `assistantMessageId`, `status: "done"`, `createdAt` |
 | error | 业务或上游错误 | `code`, `message`（与统一错误码对齐） |
 
 **meta 示例**
@@ -254,7 +253,7 @@ data: {"delta":"根据"}
 
 ```
 event: done
-data: {"assistantMessageId":102,"status":"success","createdAt":"2026-04-19T08:05:00Z"}
+data: {"assistantMessageId":102,"status":"done","createdAt":"2026-04-19T08:05:00Z"}
 
 ```
 
@@ -296,7 +295,7 @@ data: {"code":3103,"message":"会话已失效，请新建会话"}
 |------|------|------|
 | sessionId | string | 业务会话 ID |
 | title | string | 标题（首问截断） |
-| lastReplyPreview | string \| null | 助手**最后一条**回复的摘要（取 `contentMd` 去换行、截断约 100 字）；尚无助手消息或内容为空时为 `null` |
+| lastReplyPreview | string \| null | 助手**最后一条**回复的摘要（取 `content` 去换行、截断约 100 字）；尚无助手消息或内容为空时为 `null` |
 | updatedAt | string | 最近更新时间（UTC） |
 | createdAt | string | 创建时间（UTC） |
 
@@ -391,8 +390,8 @@ data: {"code":3103,"message":"会话已失效，请新建会话"}
 |------|------|------|
 | id | integer | 消息主键 |
 | role | string | `user` \| `assistant` |
-| contentMd | string | 内容（Markdown） |
-| status | string | `streaming` \| `success` \| `failed` |
+| content | string | 内容（Markdown） |
+| feedbackType | string | 当前用户对该消息的反馈类型；无记录时返回空字符串；返回空标识没有反馈过且没有点赞；如果等于liked标识用户点赞了；不为空的其余情况均为已反馈过问题 `""` |
 | errorCode | string \| null | 失败时业务错误码 |
 | createdAt | string | 创建时间（UTC） |
 
@@ -409,16 +408,16 @@ data: {"code":3103,"message":"会话已失效，请新建会话"}
       {
         "id": 101,
         "role": "user",
-        "contentMd": "防护口罩如何选择？",
-        "status": "success",
+        "content": "防护口罩如何选择？",
+        "feedbackType": "",
         "errorCode": null,
         "createdAt": "2026-04-19T08:00:00Z"
       },
       {
         "id": 102,
         "role": "assistant",
-        "contentMd": "……",
-        "status": "success",
+        "content": "……",
+        "feedbackType": "liked",
         "errorCode": null,
         "createdAt": "2026-04-19T08:00:05Z"
       }
@@ -474,7 +473,7 @@ data: {"code":3103,"message":"会话已失效，请新建会话"}
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | messageId | integer | 是 | 被反馈的 AI 消息 ID（`messages.id`） |
-| feedbackType | string | 是 | 反馈类型（业务自定义字符串，如 `suggestion`、`bug` 等） |
+| feedbackType | string | 是 | 反馈类型（业务自定义字符串，如 `liked`、`suggestion`、`bug` 等） |
 | contact | string | 否 | 联系方式，邮箱或手机号二选一填在同一字段即可 |
 | reasonText | string | 否 | 自定义说明，建议长度上限 256 |
 

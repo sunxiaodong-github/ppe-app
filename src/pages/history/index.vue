@@ -16,10 +16,19 @@
     </view>
 
     <!-- List -->
-    <scroll-view v-if="items.length > 0" class="list" scroll-y>
-      <view 
-        v-for="(item, index) in items" 
-        :key="item.id"
+    <scroll-view
+      v-if="items.length > 0"
+      class="list"
+      scroll-y
+      refresher-enabled
+      :refresher-triggered="refreshing"
+      :lower-threshold="100"
+      @refresherrefresh="onRefresh"
+      @scrolltolower="onLoadMore"
+    >
+      <view
+        v-for="(item, index) in items"
+        :key="item.sessionId"
         class="item"
         hover-class="item-active"
         @touchstart="startPress(index)"
@@ -37,6 +46,11 @@
         </view>
         <AppIcon name="chevron_right" size="32" color="#ccc" />
       </view>
+
+      <!-- Loading More -->
+      <view v-if="loadingMore" class="loading-more">
+        <text>加载中...</text>
+      </view>
     </scroll-view>
 
     <!-- Empty State -->
@@ -49,8 +63,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { getSessions, deleteSession as deleteSessionApi, type SessionItem } from '@/services/sessionService';
 
-const items = ref<any[]>([]);
+const items = ref<SessionItem[]>([]);
+const refreshing = ref(false);
+const loadingMore = ref(false);
+const currentPage = ref(1);
+const hasMore = ref(true);
+const pageSize = 20;
 
 // Status bar and capsule alignment
 const customBarTop = ref('80rpx');
@@ -58,11 +78,11 @@ const customBarHeight = ref('44px');
 
 onMounted(() => {
   loadHistory();
-  
+
   // Calculate capsule position for precise alignment
   const sysInfo = uni.getSystemInfoSync();
   const statusBarHeight = sysInfo.statusBarHeight || 20;
-  
+
   let top = statusBarHeight + 7;
   let height = 32;
 
@@ -77,14 +97,43 @@ onMounted(() => {
     // Keep defaults
   }
   // #endif
-  
+
   customBarTop.value = top + 'px';
   customBarHeight.value = height + 'px';
 });
 
-const loadHistory = () => {
-  const history = uni.getStorageSync('chat_history') || [];
-  items.value = history;
+const loadHistory = async (reset = false) => {
+  try {
+    const page = reset ? 1 : currentPage.value;
+    const data = await getSessions({ page, pageSize });
+    const newItems = data.items || [];
+
+    if (reset) {
+      items.value = newItems;
+      currentPage.value = 1;
+    } else {
+      items.value.push(...newItems);
+    }
+
+    hasMore.value = newItems.length >= pageSize;
+  } catch (err) {
+    uni.showToast({ title: '加载失败', icon: 'none' });
+  }
+};
+
+const onRefresh = async () => {
+  refreshing.value = true;
+  currentPage.value = 1;
+  await loadHistory(true);
+  refreshing.value = false;
+};
+
+const onLoadMore = async () => {
+  if (loadingMore.value || !hasMore.value) return;
+  loadingMore.value = true;
+  currentPage.value++;
+  await loadHistory(false);
+  loadingMore.value = false;
 };
 
 const back = () => uni.navigateBack();
@@ -122,14 +171,15 @@ const endPress = () => {
   clearTimeout(pressTimer);
 };
 
-const navDetail = (item: any) => {
+const navDetail = (item: SessionItem) => {
   if (isLongPress) return;
   uni.reLaunch({
-    url: `/pages/welcome/index?sessionId=${item.id}`
+    url: `/pages/welcome/index?sessionId=${item.sessionId}`
   });
 };
 
 const onLongPress = (index: number) => {
+  console.log('[History] Long press detected at index:', index);
   uni.showModal({
     title: '删除会话',
     content: '删除后无法恢复，确定要删除吗？',
@@ -143,9 +193,21 @@ const onLongPress = (index: number) => {
   });
 };
 
-const confirmDelete = (index: number) => {
-  items.value.splice(index, 1);
-  uni.setStorageSync('chat_history', items.value);
+const confirmDelete = async (index: number) => {
+  const item = items.value[index];
+  if (!item) return;
+
+  console.log('[History] Deleting session:', item.sessionId);
+  try {
+    await deleteSessionApi(item.sessionId);
+    console.log('[History] Delete success, storing deletedSessionId:', item.sessionId);
+    // 记录被删除的会话 ID，chat 页面返回时检查
+    uni.setStorageSync('deletedSessionId', item.sessionId);
+    items.value.splice(index, 1);
+  } catch (err: any) {
+    console.log('[History] Delete error:', err);
+    uni.showToast({ title: err?.message || '删除失败', icon: 'none' });
+  }
 };
 </script>
 
@@ -217,4 +279,5 @@ const confirmDelete = (index: number) => {
   gap: 30rpx;
 }
 .empty-text { font-size: 32rpx; color: #ccc; }
+.loading-more { padding: 30rpx; text-align: center; font-size: 24rpx; color: #999; }
 </style>

@@ -24,25 +24,30 @@
     </view>
 
     <!-- Empty State -->
-    <view v-show="messages.length === 0" class="empty-state">
+    <view v-if="!isLoadingHistory && messages.length === 0" class="empty-state">
       <view class="hero">
         <view class="h1">Hi, 我是智护AI~</view>
         <view class="p">随时为您解答安全生产标准与规范</view>
-        
+
       </view>
 
       <view class="section-title">你可以这样问我</view>
       <scroll-view class="suggestions" scroll-y>
-        <view 
-          v-for="(q, index) in exampleQuestions" 
-          :key="index" 
-          class="card" 
+        <view
+          v-for="(q, index) in exampleQuestions"
+          :key="index"
+          class="card"
           @click="sendPreset(q)"
         >
           <text class="card-title">{{ q }}</text>
           <AppIcon name="chevron_right" size="32" color="#d1d5db" />
         </view>
       </scroll-view>
+    </view>
+
+    <!-- Loading History State -->
+    <view v-if="isLoadingHistory" class="loading-state">
+      <text class="loading-text">加载中...</text>
     </view>
 
     <!-- Chat List -->
@@ -232,6 +237,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 // aiService.ts needs to be correctly imported
 import { chatStream } from '@/services/chatService';
 import { submitFeedback } from '@/services/feedbackService';
+import { getSessionMessages } from '@/services/sessionService';
 import MarkdownIt from 'markdown-it';
 
 const md = new MarkdownIt({
@@ -246,6 +252,7 @@ const chatScrollTop = ref(0);
 const scrollIntoView = ref('');
 const isStreaming = ref(false);
 const isMounted = ref(false);
+const isLoadingHistory = ref(false);
 const keyboardHeight = ref(0);
 
 // Status bar and capsule alignment
@@ -616,24 +623,59 @@ onMounted(() => {
   if (options && options.sessionId) {
     loadSession(options.sessionId);
   }
+
+  // 监听会话删除事件
+  uni.$on('sessionDeleted', onSessionDeleted);
 });
 
 onUnmounted(() => {
   isMounted.value = false;
+  uni.offShow(onShowCallback);
 });
 
-const loadSession = (id: string) => {
-  const history = uni.getStorageSync('chat_history') || [];
-  const session = history.find((s: any) => s.id.toString() === id.toString());
-  if (session) {
-    messages.value = session.messages.map((m: any) => ({
-      ...m,
-      interaction: m.interaction || 'none'
+// 检测从历史页面返回时的会话删除
+const onShowCallback = () => {
+  const deletedSessionId = uni.getStorageSync('deletedSessionId');
+  console.log('[Chat] onShow - deletedSessionId:', deletedSessionId, 'currentSessionId:', currentSessionId.value);
+  if (deletedSessionId && currentSessionId.value === deletedSessionId) {
+    console.log('[Chat] Resetting session due to deletion');
+    currentSessionId.value = null;
+    messages.value = [];
+    inputValue.value = '';
+  }
+  uni.removeStorageSync('deletedSessionId');
+};
+// 立即注册 onShow，以便页面显示时触发
+uni.onShow(onShowCallback);
+
+// 监听会话删除事件
+const onSessionDeleted = (deletedSessionId: string) => {
+  if (currentSessionId.value === deletedSessionId) {
+    // 当前会话被删除，重置为新会话
+    currentSessionId.value = null;
+    messages.value = [];
+    inputValue.value = '';
+  }
+};
+
+const loadSession = async (sessionId: string) => {
+  isLoadingHistory.value = true;
+  currentSessionId.value = sessionId; // 设置当前会话 ID
+  try {
+    const data = await getSessionMessages(sessionId);
+    messages.value = data.messages.map((m: any) => ({
+      role: m.role,
+      content: m.content,
+      messageId: m.id,
+      interaction: m.feedbackType === 'liked' ? 'liked' : (m.feedbackType ? 'feedbacked' : 'none')
     }));
-    // Auto scroll to bottom after state update
     setTimeout(() => {
       scrollToBottom(true);
     }, 150);
+  } catch (err) {
+    uni.showToast({ title: '加载失败', icon: 'none' });
+  } finally {
+    isLoadingHistory.value = false;
   }
 };
 
@@ -1447,4 +1489,6 @@ const handleMarkdownClick = (e: any) => {
   margin-left: 4rpx;
   margin-top: -4rpx;
 }
+.loading-state { flex: 1; display: flex; align-items: center; justify-content: center; }
+.loading-text { font-size: 28rpx; color: #999; }
 </style>
