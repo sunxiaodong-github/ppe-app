@@ -27,11 +27,19 @@ export interface SessionMessagesResponse {
   messages: SessionMessage[];
 }
 
+export interface Feedback {
+  id: number;
+  feedbackType: string;
+  contact: string | null;
+  reasonText: string | null;
+  createdAt: string;
+}
+
 export interface SessionMessage {
   id: number;
   role: 'user' | 'assistant';
   content: string;
-  feedbackType: string;
+  feedback: Feedback | null;
   errorCode: string | null;
   createdAt: string;
 }

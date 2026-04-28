@@ -236,7 +236,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 
 // aiService.ts needs to be correctly imported
 import { chatStream } from '@/services/chatService';
-import { submitFeedback } from '@/services/feedbackService';
+import { submitFeedback, deleteFeedback } from '@/services/feedbackService';
 import { getSessionMessages } from '@/services/sessionService';
 import MarkdownIt from 'markdown-it';
 
@@ -554,9 +554,32 @@ const currentFeedbackIndex = ref<number | null>(null);
 const showFeedbackModal = ref(false);
 
 const goFeedback = (index: number) => {
+  const msg = messages.value[index];
+  if (!msg) return;
+
+  // 如果已经反馈，点击即取消
+  if (msg.interaction === 'feedbacked' && msg.feedbackId) {
+    cancelFeedback(index);
+    return;
+  }
+
+  // 打开反馈弹窗
   currentFeedbackIndex.value = index;
   showFeedbackModal.value = true;
   feedbackText.value = '';
+};
+
+const cancelFeedback = async (index: number) => {
+  const msg = messages.value[index];
+  if (!msg || !msg.feedbackId) return;
+
+  try {
+    await deleteFeedback(msg.feedbackId);
+    msg.interaction = 'none';
+    msg.feedbackId = undefined;
+  } catch (err: any) {
+    uni.showToast({ title: err?.message || '取消失败', icon: 'none' });
+  }
 };
 
 const closeFeedback = () => {
@@ -568,13 +591,22 @@ const handleSubmitFeedback = async () => {
   if (feedbackText.value.trim()) {
     if (currentFeedbackIndex.value !== null && messages.value[currentFeedbackIndex.value]) {
       const msg = messages.value[currentFeedbackIndex.value];
+      // 如果之前有反馈，先删除旧反馈
+      if (msg.feedbackId) {
+        try {
+          await deleteFeedback(msg.feedbackId);
+        } catch (err: any) {
+          // 忽略删除错误，继续提交新反馈
+        }
+      }
       try {
-        await submitFeedback({
+        const res = await submitFeedback({
           messageId: msg.messageId as number,
           feedbackType: 'suggestion',
           reasonText: feedbackText.value.trim()
         });
         msg.interaction = 'feedbacked';
+        msg.feedbackId = res.feedbackId;
       } catch (err: any) {
         uni.showToast({
           title: err?.message || '提交失败',
@@ -665,7 +697,8 @@ const loadSession = async (sessionId: string) => {
       role: m.role,
       content: m.content,
       messageId: m.id,
-      interaction: m.feedbackType === 'liked' ? 'liked' : (m.feedbackType ? 'feedbacked' : 'none')
+      feedbackId: m.feedback?.id,
+      interaction: m.feedback?.feedbackType === 'liked' ? 'liked' : (m.feedback?.feedbackType ? 'feedbacked' : 'none')
     }));
     setTimeout(() => {
       scrollToBottom(true);
@@ -774,25 +807,36 @@ const saveToHistory = () => {
 const toggleLike = async (index: number) => {
   if (!messages.value[index]) return;
   const msg = messages.value[index];
-  const currentStatus = msg.interaction;
 
-  // If already liked, toggle off locally (no API call for unlike)
-  if (currentStatus === 'liked') {
+  if (msg.interaction === 'liked') {
+    // 取消点赞
+    if (msg.feedbackId) {
+      try {
+        await deleteFeedback(msg.feedbackId);
+      } catch (err: any) {
+        uni.showToast({ title: err?.message || '取消失败', icon: 'none' });
+        return;
+      }
+    }
     msg.interaction = 'none';
-    return;
-  }
-
-  // Call API to submit like
-  try {
-    await submitFeedback({
-      messageId: msg.messageId as number,
-      feedbackType: 'liked'
-    });
-    msg.interaction = 'liked';
-  } catch (err: any) {
-    if (err?.code === 2003) {
-      uni.showToast({ title: '已反馈，请取消后再点赞', icon: 'none' });
-    } else {
+    msg.feedbackId = undefined;
+  } else {
+    // 替换为点赞（先删旧反馈，再提交新反馈）
+    if (msg.feedbackId) {
+      try {
+        await deleteFeedback(msg.feedbackId);
+      } catch (err: any) {
+        // 忽略删除错误，继续提交
+      }
+    }
+    try {
+      const res = await submitFeedback({
+        messageId: msg.messageId as number,
+        feedbackType: 'liked'
+      });
+      msg.interaction = 'liked';
+      msg.feedbackId = res.feedbackId;
+    } catch (err: any) {
       uni.showToast({ title: err?.message || '操作失败', icon: 'none' });
     }
   }

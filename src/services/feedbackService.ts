@@ -21,3 +21,11 @@ export async function submitFeedback(params: FeedbackParams): Promise<{ feedback
   });
   return result;
 }
+
+export async function deleteFeedback(feedbackId: number): Promise<{ deleted: boolean }> {
+  const result = await request<{ deleted: boolean }>({
+    url: `${BASE_URL}/api/v1/feedback/${feedbackId}`,
+    method: 'DELETE'
+  });
+  return result;
+}

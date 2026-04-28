@@ -18,6 +18,7 @@
 | GET | `/api/v1/sessions/{sessionId}/messages` | 会话消息列表 |
 | DELETE | `/api/v1/sessions/{sessionId}` | 删除会话 |
 | POST | `/api/v1/feedback/submit` | 提交反馈 |
+| DELETE | `/api/v1/feedback/{feedbackId}` | 删除反馈 |
 
 ---
 
@@ -86,8 +87,9 @@ CREATE TABLE feedbacks (
   feedback_type VARCHAR(64) NULL COMMENT '反馈类型（业务自定义）',
   contact VARCHAR(128) NULL COMMENT '联系方式（邮箱或手机号）',
   reason_text VARCHAR(256) NULL COMMENT '自定义说明',
+  is_deleted TINYINT(1) NOT NULL DEFAULT 0 COMMENT '软删除：0否 1是',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '反馈时间（UTC）',
-  UNIQUE KEY uk_feedback_once (message_id, user_id),
+  KEY idx_feedback_user_message_deleted (user_id, message_id, is_deleted),
   CONSTRAINT fk_feedbacks_message FOREIGN KEY (message_id) REFERENCES messages(id),
   CONSTRAINT fk_feedbacks_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='回答反馈表';
@@ -391,9 +393,19 @@ data: {"code":3103,"message":"会话已失效，请新建会话"}
 | id | integer | 消息主键 |
 | role | string | `user` \| `assistant` |
 | content | string | 内容（Markdown） |
-| feedbackType | string | 当前用户对该消息的反馈类型；无记录时返回空字符串；返回空标识没有反馈过且没有点赞；如果等于liked标识用户点赞了；不为空的其余情况均为已反馈过问题 `""` |
+| feedback | object \| null | 当前用户对该消息的反馈对象；无反馈时为 `null` |
 | errorCode | string \| null | 失败时业务错误码 |
 | createdAt | string | 创建时间（UTC） |
+
+**feedback 对象**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | integer | 反馈记录主键 |
+| feedbackType | string | 反馈类型（如 `liked`、`suggestion`、`bug`） |
+| contact | string \| null | 联系方式 |
+| reasonText | string \| null | 自定义说明 |
+| createdAt | string | 反馈创建时间（UTC） |
 
 **Response 示例**
 
@@ -409,7 +421,7 @@ data: {"code":3103,"message":"会话已失效，请新建会话"}
         "id": 101,
         "role": "user",
         "content": "防护口罩如何选择？",
-        "feedbackType": "",
+        "feedback": null,
         "errorCode": null,
         "createdAt": "2026-04-19T08:00:00Z"
       },
@@ -417,7 +429,13 @@ data: {"code":3103,"message":"会话已失效，请新建会话"}
         "id": 102,
         "role": "assistant",
         "content": "……",
-        "feedbackType": "liked",
+        "feedback": {
+          "id": 5001,
+          "feedbackType": "liked",
+          "contact": null,
+          "reasonText": null,
+          "createdAt": "2026-04-19T08:01:00Z"
+        },
         "errorCode": null,
         "createdAt": "2026-04-19T08:00:05Z"
       }
@@ -466,7 +484,7 @@ data: {"code":3103,"message":"会话已失效，请新建会话"}
 
 **`POST /api/v1/feedback/submit`**
 
-对**助手消息**提交反馈；同一用户对同一 `messageId` 仅允许一次。
+对**助手消息**提交反馈；若已存在反馈，服务端会先删除旧反馈再创建新反馈。
 
 **Request Body**
 
@@ -506,7 +524,41 @@ data: {"code":3103,"message":"会话已失效，请新建会话"}
 }
 ```
 
-**常见错误码**：`1001`（含 `feedbackType` 为空）、`2002`（消息不存在）、`2003`（已反馈）
+**常见错误码**：`1001`（含 `feedbackType` 为空）、`2002`（消息不存在）
+
+### 5.2 删除反馈
+
+**`DELETE /api/v1/feedback/{feedbackId}`**
+
+删除当前用户对指定助手消息的反馈记录。
+
+**Path Parameters**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| feedbackId | integer | 是 | 反馈主键 ID（`feedbacks.id`） |
+
+**Response `data`**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| deleted | boolean | 是否删除成功 |
+
+**Request 示例**：`DELETE /api/v1/feedback/5001`
+
+**Response 示例**
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "deleted": true
+  }
+}
+```
+
+**常见错误码**：`2002`（消息不存在/无权限/反馈不存在）
 
 ---
 
@@ -533,7 +585,6 @@ data: {"code":3103,"message":"会话已失效，请新建会话"}
 | 1002 | 未授权（未携带或 token 无效） |
 | 2001 | 会话不存在 |
 | 2002 | 消息不存在 |
-| 2003 | 反馈已提交 |
 | 3001 | 外部服务超时 |
 | 3002 | 外部服务限流 |
 | 3003 | 外部服务异常 |
