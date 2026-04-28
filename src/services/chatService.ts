@@ -2,7 +2,7 @@
  * Service to interact with backend Chat API (SSE streaming)
  */
 
-import { getToken } from './apiService';
+import { getToken, isTokenExpired, login } from './apiService';
 
 const BASE_URL = 'https://www.agidata.xin';
 
@@ -35,21 +35,70 @@ export interface ChatStreamHandle {
 
 let currentRequestTask: any = null;
 
+// 获取有效的 token（检查过期）
+async function getValidToken(): Promise<string | null> {
+  let token = getToken();
+  if (!token) return null;
+
+  // 检查是否即将过期（提前 60 秒）
+  if (isTokenExpired()) {
+    // 刷新 token
+    const result = await login();
+    if (result.success) {
+      token = getToken();
+    } else {
+      return null;
+    }
+  }
+
+  return token;
+}
+
 export function chatStream(
   options: ChatStreamOptions,
   callbacks: ChatStreamCallbacks
 ): ChatStreamHandle {
   const token = getToken();
-  if (!token) {
-    callbacks.onError({ code: -1, message: '未登录，请先登录' });
+  const expired = isTokenExpired();
+
+  if (!token || expired) {
+    login().then((result) => {
+      if (result.success) {
+        const newToken = getToken();
+        if (newToken) {
+          doChatStream(newToken, options, callbacks);
+        } else {
+          callbacks.onError({ code: -1, message: '登录失效，请重新登录' });
+        }
+      } else {
+        callbacks.onError({ code: -1, message: result.error || '登录失效，请重新登录' });
+      }
+    });
     return { abort: () => {} };
   }
 
+  return doChatStream(token, options, callbacks);
+}
+
+// 保存当前请求的 abort 函数，用于刷新 token 时中止旧请求
+let currentAbortController: (() => void) | null = null;
+
+function doChatStream(
+  token: string,
+  options: ChatStreamOptions,
+  callbacks: ChatStreamCallbacks
+): ChatStreamHandle {
   let buffer = '';
   let currentSessionId = '';
   let currentAssistantMessageId = 0;
 
   const decoder = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8') : null;
+
+  // 如果有旧请求在运行，先中止
+  if (currentAbortController) {
+    currentAbortController();
+    currentAbortController = null;
+  }
 
   const requestTask = uni.request({
     url: `${BASE_URL}/api/v1/chat`,
@@ -64,6 +113,35 @@ export function chatStream(
     },
     enableChunked: true,
     success: (res) => {
+      // HTTP 401/403 表示 token 无效
+      if (res.statusCode === 401 || res.statusCode === 403) {
+        login().then((loginResult) => {
+          if (loginResult.success) {
+            const newToken = getToken();
+            if (newToken) {
+              doChatStream(newToken, options, callbacks);
+              return;
+            }
+          }
+          callbacks.onError({ code: res.statusCode, message: '登录失效，请重新登录' });
+        });
+        return;
+      }
+      // 检查业务错误码（HTTP 200 但 code 不是 0）
+      const data = res.data as any;
+      if (data && data.code === 1002) {
+        login().then((loginResult) => {
+          if (loginResult.success) {
+            const newToken = getToken();
+            if (newToken) {
+              doChatStream(newToken, options, callbacks);
+              return;
+            }
+          }
+          callbacks.onError({ code: data.code, message: data.message || '登录失效，请重新登录' });
+        });
+        return;
+      }
       if (res.statusCode !== 200) {
         callbacks.onError({ code: res.statusCode || -1, message: `请求失败: ${res.statusCode}` });
       }
@@ -72,6 +150,15 @@ export function chatStream(
       callbacks.onError({ code: -1, message: err.errMsg || '网络请求失败' });
     }
   }) as any;
+
+  currentRequestTask = requestTask;
+
+  // 保存 abort 函数供刷新时使用
+  currentAbortController = () => {
+    if (requestTask && typeof requestTask.abort === 'function') {
+      requestTask.abort();
+    }
+  };
 
   currentRequestTask = requestTask;
 
@@ -88,6 +175,30 @@ export function chatStream(
         }
       } catch (e) {
         // ignore decode error
+      }
+
+      // 检查是否是 JSON 错误响应（非 SSE 格式）
+      const trimmed = str.trim();
+      if (trimmed.startsWith('{')) {
+        try {
+          const jsonData = JSON.parse(trimmed);
+          if (jsonData.code === 1002) {
+            // token 无效，刷新并重试
+            login().then((loginResult) => {
+              if (loginResult.success) {
+                const newToken = getToken();
+                if (newToken) {
+                  doChatStream(newToken, options, callbacks);
+                  return;
+                }
+              }
+              callbacks.onError({ code: jsonData.code, message: jsonData.message || '登录失效，请重新登录' });
+            });
+            return;
+          }
+        } catch (e) {
+          // 不是有效的 JSON，继续按 SSE 处理
+        }
       }
 
       buffer += str;
@@ -144,6 +255,20 @@ export function chatStream(
                 break;
 
               case 'error':
+                // 检查是否是 token 过期错误 (code 1002)
+                if (data.code === 1002) {
+                  login().then((loginResult) => {
+                    if (loginResult.success) {
+                      const newToken = getToken();
+                      if (newToken) {
+                        doChatStream(newToken, options, callbacks);
+                        return;
+                      }
+                    }
+                    callbacks.onError({ code: data.code, message: data.message || '登录失效，请重新登录' });
+                  });
+                  return;
+                }
                 callbacks.onError({
                   code: data.code || -1,
                   message: data.message || '未知错误'

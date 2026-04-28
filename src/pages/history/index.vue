@@ -77,10 +77,7 @@ const customBarHeight = ref('44px');
 
 onMounted(() => {
   loadHistory();
-
-  // 获取当前会话 ID（用于判断删除的是否是当前会话）
   currentSessionId.value = uni.getStorageSync('currentSessionId') || null;
-  console.log('[History] Current session ID:', currentSessionId.value);
 
   // Calculate capsule position for precise alignment
   const sysInfo = uni.getSystemInfoSync();
@@ -177,7 +174,6 @@ const navDetail = (item: SessionItem) => {
 };
 
 const onLongPress = (index: number) => {
-  console.log('[History] Long press detected at index:', index);
   uni.showModal({
     title: '删除会话',
     content: '删除后无法恢复，确定要删除吗？',
@@ -195,15 +191,11 @@ const confirmDelete = async (index: number) => {
   const item = items.value[index];
   if (!item) return;
 
-  console.log('[History] Deleting session:', item.sessionId);
-
   try {
     await deleteSessionApi(item.sessionId);
-    console.log('[History] Delete success');
     items.value.splice(index, 1);
     // 删除后不跳转，只更新列表，返回时再判断
   } catch (err: any) {
-    console.log('[History] Delete error:', err);
     uni.showToast({ title: err?.message || '删除失败', icon: 'none' });
   }
 };

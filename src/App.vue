@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
+import { initInterceptors } from '@/services/apiService';
+
 onLaunch(() => {
   console.log("App Launch");
-  
+
+  // 初始化 API 拦截器（尽早初始化确保所有请求都生效）
+  initInterceptors();
+
   // Robust check for agreement on every launch
   const hasAgreed = uni.getStorageSync('has_agreed');
   

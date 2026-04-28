@@ -193,7 +193,6 @@ export interface RequestOptions {
 
 export function request<T = any>(options: RequestOptions): Promise<T> {
   return new Promise((resolve, reject) => {
-    // Add Authorization header if token exists
     const token = getToken();
     const headers: Record<string, string> = options.header || {};
     if (token) {
@@ -207,10 +206,41 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
       data: options.data,
       success: (res) => {
         const data = res.data as any;
+
         if (data && data.code === 0) {
           resolve(data.data);
         } else if (data && data.code !== 0) {
-          reject(data);
+          // 如果是 token 无效错误，先尝试刷新
+          if (data.code === 1002) {
+            login().then((loginResult) => {
+              if (loginResult.success) {
+                const newToken = getToken();
+                if (newToken) {
+                  // 用新 token 重试请求
+                  headers['Authorization'] = `Bearer ${newToken}`;
+                  uni.request({
+                    url: options.url,
+                    method: options.method || 'GET',
+                    header: headers,
+                    data: options.data,
+                    success: (res2) => {
+                      const data2 = res2.data as any;
+                      if (data2 && data2.code === 0) {
+                        resolve(data2.data);
+                      } else {
+                        reject(data2);
+                      }
+                    },
+                    fail: (err) => reject(err)
+                  });
+                  return;
+                }
+              }
+              reject(data);
+            });
+          } else {
+            reject(data);
+          }
         } else {
           resolve(res.data as T);
         }
