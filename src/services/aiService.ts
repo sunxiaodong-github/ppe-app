@@ -90,8 +90,10 @@ export function chatStream(
         if (!line.trim()) continue;
         const dataMatch = line.match(/data:(.*)$/);
         if (dataMatch) {
+          const rawData = dataMatch[1].trim();
+          if (rawData === '[DONE]') continue;
           try {
-            const data = JSON.parse(dataMatch[1]);
+            const data = JSON.parse(rawData);
             if (data.type === 'response.output_text.delta' && data.delta) {
               onChunk(data.delta);
               fullText += data.delta;
