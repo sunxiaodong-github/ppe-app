@@ -592,7 +592,7 @@ onMounted(() => {
   // Calculate capsule position for precise alignment
   const sysInfo = uni.getSystemInfoSync();
   const statusBarHeight = sysInfo.statusBarHeight || 20;
-  
+
   let top = statusBarHeight + 7;
   let height = 32;
 
@@ -607,7 +607,7 @@ onMounted(() => {
     // Keep defaults
   }
   // #endif
-  
+
   customBarTop.value = top + 'px';
   customBarHeight.value = height + 'px';
   // Check agreement
@@ -619,9 +619,22 @@ onMounted(() => {
 
   // Load session if coming from history
   const pages = getCurrentPages();
-  const options = (pages[pages.length - 1] as any).options;
-  if (options && options.sessionId) {
+  const currentPage = pages[pages.length - 1] as any;
+  const options = currentPage.options || {};
+
+  // 检查是否需要重置会话（从删除会话返回）
+  if (options.deletedSessionId) {
+    console.log('[Chat] Detected deleted session, resetting:', options.deletedSessionId);
+    currentSessionId.value = null;
+    messages.value = [];
+    inputValue.value = '';
+  } else if (options.sessionId) {
     loadSession(options.sessionId);
+  }
+
+  // 记录当前会话 ID 到 storage，供 history 页面判断
+  if (currentSessionId.value) {
+    uni.setStorageSync('currentSessionId', currentSessionId.value);
   }
 
   // 监听会话删除事件
@@ -630,23 +643,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   isMounted.value = false;
-  uni.offShow(onShowCallback);
+  uni.$off('sessionDeleted', onSessionDeleted);
 });
-
-// 检测从历史页面返回时的会话删除
-const onShowCallback = () => {
-  const deletedSessionId = uni.getStorageSync('deletedSessionId');
-  console.log('[Chat] onShow - deletedSessionId:', deletedSessionId, 'currentSessionId:', currentSessionId.value);
-  if (deletedSessionId && currentSessionId.value === deletedSessionId) {
-    console.log('[Chat] Resetting session due to deletion');
-    currentSessionId.value = null;
-    messages.value = [];
-    inputValue.value = '';
-  }
-  uni.removeStorageSync('deletedSessionId');
-};
-// 立即注册 onShow，以便页面显示时触发
-uni.onShow(onShowCallback);
 
 // 监听会话删除事件
 const onSessionDeleted = (deletedSessionId: string) => {
@@ -687,6 +685,7 @@ const resetChat = () => {
   if (isStreaming.value) return;
   messages.value = [];
   currentSessionId.value = null;
+  uni.removeStorageSync('currentSessionId');
   inputValue.value = '';
 };
 
@@ -736,11 +735,13 @@ const startChat = async (userText: string) => {
       onMeta: (meta) => {
         // Save sessionId and messageId for future use
         currentSessionId.value = meta.sessionId;
+        uni.setStorageSync('currentSessionId', meta.sessionId);
         messages.value[aiMsgIndex].messageId = meta.assistantMessageId;
       },
       onComplete: (result) => {
         isStreaming.value = false;
         currentSessionId.value = result.sessionId;
+        uni.setStorageSync('currentSessionId', result.sessionId);
         messages.value[aiMsgIndex].messageId = result.assistantMessageId;
         saveToHistory();
         scrollToBottom(true);

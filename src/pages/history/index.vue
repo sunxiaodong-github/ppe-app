@@ -72,12 +72,19 @@ const currentPage = ref(1);
 const hasMore = ref(true);
 const pageSize = 20;
 
+// 当前会话 ID（从 welcome 页面传递或从 storage 获取）
+const currentSessionId = ref<string | null>(null);
+
 // Status bar and capsule alignment
 const customBarTop = ref('80rpx');
 const customBarHeight = ref('44px');
 
 onMounted(() => {
   loadHistory();
+
+  // 获取当前会话 ID（用于判断删除的是否是当前会话）
+  currentSessionId.value = uni.getStorageSync('currentSessionId') || null;
+  console.log('[History] Current session ID:', currentSessionId.value);
 
   // Calculate capsule position for precise alignment
   const sysInfo = uni.getSystemInfoSync();
@@ -136,7 +143,20 @@ const onLoadMore = async () => {
   loadingMore.value = false;
 };
 
-const back = () => uni.navigateBack();
+const back = () => {
+  // 返回时判断：如果当前会话存在且未被删除，返回该会话；否则回首页
+  const currentId = uni.getStorageSync('currentSessionId');
+  if (currentId) {
+    // 检查当前会话是否还在列表中
+    const stillExists = items.value.some(item => item.sessionId === currentId);
+    if (stillExists) {
+      uni.reLaunch({ url: `/pages/welcome/index?sessionId=${currentId}` });
+      return;
+    }
+  }
+  // 当前会话不存在，回首页
+  uni.reLaunch({ url: '/pages/welcome/index' });
+};
 
 const resetAgreement = () => {
   uni.removeStorageSync('has_agreed');
@@ -198,12 +218,12 @@ const confirmDelete = async (index: number) => {
   if (!item) return;
 
   console.log('[History] Deleting session:', item.sessionId);
+
   try {
     await deleteSessionApi(item.sessionId);
-    console.log('[History] Delete success, storing deletedSessionId:', item.sessionId);
-    // 记录被删除的会话 ID，chat 页面返回时检查
-    uni.setStorageSync('deletedSessionId', item.sessionId);
+    console.log('[History] Delete success');
     items.value.splice(index, 1);
+    // 删除后不跳转，只更新列表，返回时再判断
   } catch (err: any) {
     console.log('[History] Delete error:', err);
     uni.showToast({ title: err?.message || '删除失败', icon: 'none' });
