@@ -7,10 +7,6 @@
         </view>
         <view class="header-title">历史会话</view>
         <view class="right-actions">
-          <text 
-            class="reset-btn"
-            @click="resetAgreement"
-          >重置</text>
         </view>
       </view>
     </view>
@@ -158,24 +154,6 @@ const back = () => {
   uni.reLaunch({ url: '/pages/welcome/index' });
 };
 
-const resetAgreement = () => {
-  uni.removeStorageSync('has_agreed');
-  uni.reLaunch({ url: '/pages/privacy/index' });
-};
-
-const confirmClearAll = () => {
-  uni.showModal({
-    title: '提示',
-    content: '确定要清除所有聊天记录吗？',
-    success: (res) => {
-      if (res.confirm) {
-        uni.removeStorageSync('chat_history');
-        items.value = [];
-      }
-    }
-  });
-};
-
 let pressTimer: any = null;
 let isLongPress = false;
 
@@ -272,7 +250,6 @@ const confirmDelete = async (index: number) => {
   height: 100%;
 }
 .reset-btn { font-size: 24rpx; color: #94a3b8; text-decoration: none; border: 1rpx solid #e2e8f0; padding: 4rpx 16rpx; border-radius: 20rpx; }
-.clear-all { font-size: 24rpx; color: #999; }
 
 .list { flex: 1; padding: 40rpx 30rpx 24rpx; }
 .item {
