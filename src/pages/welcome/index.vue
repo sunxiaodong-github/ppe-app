@@ -70,7 +70,7 @@
         <!-- AI Answer -->
         <view v-else class="ai-msg-row">
           <view class="avatar">
-            <AppIcon name="security" size="52" color="#1a73e8" fill />
+            <image class="ai-avatar-img" src="/static/icons/ai-bot.png" mode="aspectFit" />
           </view>
           <view class="ai-content-box" :class="{ 'is-streaming': isStreaming && index === messages.length - 1 }">
             <view class="ai-msg">
@@ -1047,16 +1047,16 @@ const handleMarkdownClick = (e: any) => {
 }
 
 .ai-msg-row { display: flex; flex-direction: column; align-items: flex-start; gap: 20rpx; margin-bottom: 56rpx; width: 100%; }
-.avatar { 
-  width: 72rpx; 
-  height: 72rpx; 
-  background-color: #ffffff;
+.ai-avatar-img { width: 96rpx; height: 96rpx; border-radius: 16rpx; background: transparent; }
+.avatar {
+  width: 72rpx;
+  height: 72rpx;
+  background-color: transparent;
   border-radius: 20rpx;
-  display: flex; 
-  align-items: center; 
-  justify-content: center; 
-  flex-shrink: 0; 
-  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 .ai-content-box { width: auto; max-width: 92%; }
 .ai-msg { 
